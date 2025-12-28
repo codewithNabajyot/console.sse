@@ -34,12 +34,16 @@ import {
 import { ModeToggle } from '@/components/ModeToggle'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
+import { useMasterConfigs } from '@/hooks/useMasterConfigs'
 
 export const Layout: React.FC = () => {
   const { orgSlug } = useParams()
   const location = useLocation()
   const [isMoreOpen, setIsMoreOpen] = React.useState(false)
   const { user, profile, signOut } = useAuth()
+  
+  // Pre-fetch and cache master configs
+  useMasterConfigs()
 
   // Get user initials from email or name
   const getUserInitials = () => {
