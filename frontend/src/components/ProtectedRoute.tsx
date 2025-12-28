@@ -1,8 +1,9 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
+  const { orgSlug } = useParams()
 
   if (loading) {
     return (
@@ -17,6 +18,12 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  // If profile is fully loaded, validate slug
+  if (profile && orgSlug && profile.organization.slug !== orgSlug) {
+    console.warn(`Unauthorized access attempt to org: ${orgSlug}. Redirecting to ${profile.organization.slug}`)
+    return <Navigate to={`/${profile.organization.slug}/dashboard`} replace />
   }
 
   return <>{children}</>

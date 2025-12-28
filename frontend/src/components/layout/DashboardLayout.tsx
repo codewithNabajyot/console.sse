@@ -39,10 +39,17 @@ export const DashboardLayout: React.FC = () => {
   const { orgSlug } = useParams()
   const location = useLocation()
   const [isMoreOpen, setIsMoreOpen] = React.useState(false)
-  const { user, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
 
   // Get user initials from email or name
   const getUserInitials = () => {
+    if (profile?.full_name) {
+      const parts = profile.full_name.split(' ')
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      }
+      return profile.full_name.substring(0, 2).toUpperCase()
+    }
     if (!user) return 'U'
     const email = user.email || ''
     const parts = email.split('@')[0].split('.')
@@ -53,6 +60,7 @@ export const DashboardLayout: React.FC = () => {
   }
 
   const handleSignOut = async () => {
+    console.log('Button clicked: Sign Out')
     await signOut()
   }
 
@@ -81,7 +89,7 @@ export const DashboardLayout: React.FC = () => {
             <Link to={`/${orgSlug}/dashboard`} className="flex items-center gap-2">
               <img 
                 src="/Suryasathi_logo_hz.svg" 
-                alt="Suryasathi Logo" 
+                alt={`${profile?.organization?.name || 'Company'} Logo`} 
                 className="h-8 md:h-10 w-auto object-contain"
               />
             </Link>
@@ -104,10 +112,17 @@ export const DashboardLayout: React.FC = () => {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">Account</p>
+                    <p className="text-sm font-medium leading-none">
+                      {profile?.full_name || 'User'}
+                    </p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user?.email}
                     </p>
+                    {profile?.organization && (
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-primary mt-1">
+                        {profile.organization.name}
+                      </p>
+                    )}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

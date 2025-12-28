@@ -21,27 +21,31 @@ export default function Login() {
       setError(error.message)
       setLoading(false)
     } else {
-      navigate('/suryasathi/dashboard')
+      // The AuthProvider will automatically fetch the profile and redirect
+      // We just need to wait a tiny bit or let the App.tsx handle it
+      // But for better UX, we can stay here until profile is ready or hardcode redirect if we know where they are going
+      // Since we don't know the slug here yet, we'll let the user land on / and get redirected by App.tsx
+      navigate('/')
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="bg-card text-card-foreground rounded-2xl shadow-xl w-full max-w-md p-8 border border-border">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your Solar Dashboard</p>
+          <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
+          <p className="text-muted-foreground">Sign in to your Solar Dashboard</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-sm">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium mb-1">
               Email Address
             </label>
             <input
@@ -50,13 +54,13 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition text-foreground"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium mb-1">
               Password
             </label>
             <input
@@ -65,7 +69,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition text-foreground"
               placeholder="••••••••"
             />
           </div>
@@ -73,16 +77,16 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary-600 text-white py-2.5 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-gray-600 text-sm">
+          <p className="text-muted-foreground text-sm">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-primary-600 font-medium hover:text-primary-700">
+            <Link to="/signup" className="text-primary font-medium hover:underline">
               Sign up
             </Link>
           </p>

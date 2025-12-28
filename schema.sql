@@ -350,26 +350,38 @@ ON CONFLICT DO NOTHING;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
-  default_org_id UUID;
+  target_org_id UUID;
   read_only_role_id UUID;
+  provided_slug TEXT;
 BEGIN
-  -- Get the default organization (Suryasathi)
-  SELECT id INTO default_org_id 
+  -- Get the slug from user metadata
+  provided_slug := COALESCE(NEW.raw_user_meta_data->>'org_slug', 'suryasathi');
+  
+  -- Look up the organization by slug
+  SELECT id INTO target_org_id 
   FROM public.organizations 
-  WHERE slug = 'suryasathi' 
+  WHERE slug = provided_slug 
   LIMIT 1;
 
-  -- Get the Read Only role ID
+  -- Fallback to default if not found
+  IF target_org_id IS NULL THEN
+    SELECT id INTO target_org_id 
+    FROM public.organizations 
+    WHERE slug = 'suryasathi' 
+    LIMIT 1;
+  END IF;
+
+  -- Get the Read Only role ID for this organization
   SELECT id INTO read_only_role_id 
   FROM public.org_roles 
-  WHERE org_id = default_org_id AND name = 'Read Only' 
+  WHERE org_id = target_org_id AND name = 'Read Only' 
   LIMIT 1;
 
   -- Create profile for the new user
   INSERT INTO public.profiles (id, org_id, role_id, full_name)
   VALUES (
     NEW.id,
-    default_org_id,
+    target_org_id,
     read_only_role_id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email)
   );
@@ -384,7 +396,34 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 8. COMMENTS FOR DOCUMENTATION
+-- 8. ROW LEVEL SECURITY POLICIES
+
+-- Helper to get user org id
+CREATE OR REPLACE FUNCTION get_user_org_id()
+RETURNS UUID AS $$
+  SELECT org_id FROM profiles WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- Organizations: Public read access
+CREATE POLICY "Allow public read organizations" ON organizations FOR SELECT TO authenticated, anon USING (true);
+
+-- Profiles: Own record access
+CREATE POLICY "Users can read own profile" ON profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
+
+-- Org Roles: Org-specific access
+CREATE POLICY "Users can read org roles" ON org_roles FOR SELECT TO authenticated USING (org_id = get_user_org_id());
+
+-- Entity Data Policies (Org-specific)
+CREATE POLICY "Users can manage projects" ON projects FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+CREATE POLICY "Users can manage customers" ON customers FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+CREATE POLICY "Users can manage vendors" ON vendors FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+CREATE POLICY "Users can manage bank accounts" ON bank_accounts FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+CREATE POLICY "Users can manage invoices" ON invoices FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+CREATE POLICY "Users can manage income" ON income FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+CREATE POLICY "Users can manage expenses" ON expenses FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+
+-- 9. COMMENTS FOR DOCUMENTATION
 
 COMMENT ON TABLE organizations IS 'Multi-tenant organizations. Default: Suryasathi Solar';
 COMMENT ON TABLE org_roles IS 'Role-based access control. Default roles: Admin, Read Only';

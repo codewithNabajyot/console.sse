@@ -6,6 +6,7 @@ export default function Signup() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
+  const [orgSlug, setOrgSlug] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -23,7 +24,7 @@ export default function Signup() {
       return
     }
 
-    const { error } = await signUp(email, password, fullName)
+    const { error } = await signUp(email, password, fullName, orgSlug)
 
     if (error) {
       setError(error.message)
@@ -38,40 +39,40 @@ export default function Signup() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="bg-card text-card-foreground rounded-2xl shadow-xl w-full max-w-md p-8 text-center border border-border">
+          <div className="w-16 h-16 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Created!</h2>
-          <p className="text-gray-600 mb-4">
+          <h2 className="text-2xl font-bold mb-2">Account Created!</h2>
+          <p className="text-muted-foreground mb-4">
             Please check your email to verify your account.
           </p>
-          <p className="text-sm text-gray-500">Redirecting to login...</p>
+          <p className="text-sm text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="bg-card text-card-foreground rounded-2xl shadow-xl w-full max-w-md p-8 border border-border">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-          <p className="text-gray-600">Get started with Solar Dashboard</p>
+          <h1 className="text-3xl font-bold mb-2">Create Account</h1>
+          <p className="text-muted-foreground">Get started with Solar Dashboard</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-sm">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="fullName" className="block text-sm font-medium mb-1">
               Full Name
             </label>
             <input
@@ -80,13 +81,29 @@ export default function Signup() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition text-foreground"
               placeholder="John Doe"
             />
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="orgSlug" className="block text-sm font-medium mb-1">
+              Company Code (slug)
+            </label>
+            <input
+              id="orgSlug"
+              type="text"
+              value={orgSlug}
+              onChange={(e) => setOrgSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+              required
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition text-foreground"
+              placeholder="suryasathi"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Lowercase letters and hyphens only</p>
+          </div>
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium mb-1">
               Email Address
             </label>
             <input
@@ -95,13 +112,13 @@ export default function Signup() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition text-foreground"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium mb-1">
               Password
             </label>
             <input
@@ -111,25 +128,25 @@ export default function Signup() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition text-foreground"
               placeholder="••••••••"
             />
-            <p className="mt-1 text-xs text-gray-500">Must be at least 6 characters</p>
+            <p className="mt-1 text-xs text-muted-foreground">Must be at least 6 characters</p>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary-600 text-white py-2.5 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-gray-600 text-sm">
+          <p className="text-muted-foreground text-sm">
             Already have an account?{' '}
-            <Link to="/login" className="text-primary-600 font-medium hover:text-primary-700">
+            <Link to="/login" className="text-primary font-medium hover:underline">
               Sign in
             </Link>
           </p>
