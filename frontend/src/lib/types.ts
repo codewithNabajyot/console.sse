@@ -39,14 +39,15 @@ export interface BankAccount {
 }
 
 export interface Note {
-  text: string
-  timestamp: string
-  user?: string
+  content: string
+  user_id: string
+  user_name: string
+  created_at: string
 }
 
 // Form input types (without generated fields)
-export type CustomerInput = Omit<Customer, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at'>
+export type CustomerInput = Omit<Customer, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes'> & { notes?: Note[] }
 
-export type VendorInput = Omit<Vendor, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at'>
+export type VendorInput = Omit<Vendor, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes'> & { notes?: Note[] }
 
-export type BankAccountInput = Omit<BankAccount, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'current_balance'>
+export type BankAccountInput = Omit<BankAccount, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'current_balance' | 'notes'> & { notes?: Note[] }

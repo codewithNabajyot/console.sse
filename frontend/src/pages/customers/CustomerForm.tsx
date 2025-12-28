@@ -2,29 +2,28 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
-import { useVendor, useCreateVendor, useUpdateVendor } from '@/hooks/useVendors'
+import { useCustomer, useCreateCustomer, useUpdateCustomer } from '@/hooks/useCustomers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import type { VendorInput } from '@/lib/types'
+import { Card, CardContent } from '@/components/ui/card'
+import type { CustomerInput } from '@/lib/types'
 
 type FormData = {
   name: string
-  category: string
+  email: string
+  phone: string
   gst_number: string
-  notes: string
 }
 
-export default function VendorForm() {
+export default function CustomerForm() {
   const { orgSlug, id } = useParams()
   const navigate = useNavigate()
   const isEditMode = !!id
 
-  const { data: vendor, isLoading } = useVendor(id)
-  const createVendor = useCreateVendor()
-  const updateVendor = useUpdateVendor()
+  const { data: customer, isLoading } = useCustomer(id)
+  const createCustomer = useCreateCustomer()
+  const updateCustomer = useUpdateCustomer()
 
   const {
     register,
@@ -34,52 +33,53 @@ export default function VendorForm() {
   } = useForm<FormData>({
     defaultValues: {
       name: '',
-      category: '',
+      email: '',
+      phone: '',
       gst_number: '',
-      notes: '',
     },
   })
 
   // Populate form when editing
   useEffect(() => {
-    if (vendor) {
+    if (customer) {
       reset({
-        name: vendor.name,
-        category: vendor.category || '',
-        gst_number: vendor.gst_number || '',
-        notes: vendor.notes?.map(n => n.text).join('\n') || '',
+        name: customer.name,
+        email: customer.email || '',
+        phone: customer.phone || '',
+        gst_number: customer.gst_number || '',
       })
     }
-  }, [vendor, reset])
+  }, [customer, reset])
 
   const onSubmit = async (data: FormData) => {
-    const input: VendorInput = {
+    const input: CustomerInput = {
       name: data.name,
-      category: data.category || null,
+      email: data.email || null,
+      phone: data.phone || null,
       gst_number: data.gst_number || null,
-      notes: data.notes ? [{ text: data.notes, timestamp: new Date().toISOString() }] : [],
     }
 
     try {
       if (isEditMode && id) {
-        await updateVendor.mutateAsync({ id, input })
+        await updateCustomer.mutateAsync({ id, input })
       } else {
-        await createVendor.mutateAsync(input)
+        await createCustomer.mutateAsync(input)
       }
-      navigate(`/${orgSlug}/vendors`)
+      navigate(`/${orgSlug}/customers`)
     } catch (error) {
+      // Error is handled by the mutation hooks with toast
       console.error('Form submission error:', error)
     }
   }
 
   const handleCancel = () => {
-    navigate(`/${orgSlug}/vendors`)
+    navigate(`/${orgSlug}/customers`)
   }
 
   if (isLoading && isEditMode) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Loading vendor...</div>
+        <div className="text-muted-foreground">Loading customer...</div>
       </div>
     )
   }
@@ -93,23 +93,17 @@ export default function VendorForm() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {isEditMode ? 'Edit Vendor' : 'New Vendor'}
+            {isEditMode ? 'Edit Customer' : 'New Customer'}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {isEditMode ? 'Update vendor information' : 'Add a new vendor to your database'}
+            {isEditMode ? 'Update customer information' : 'Add a new customer to your database'}
           </p>
         </div>
       </div>
 
       {/* Form */}
       <Card>
-        <CardHeader>
-          <CardTitle>Vendor Information</CardTitle>
-          <CardDescription>
-            Enter the vendor details below. Fields marked with * are required.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Name */}
             <div className="space-y-2">
@@ -119,20 +113,32 @@ export default function VendorForm() {
               <Input
                 id="name"
                 {...register('name', { required: 'Name is required' })}
-                placeholder="Enter vendor name"
+                placeholder="Enter customer name"
               />
               {errors.name && (
                 <p className="text-sm text-destructive">{errors.name.message}</p>
               )}
             </div>
 
-            {/* Category */}
+            {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="category"
-                {...register('category')}
-                placeholder="e.g., Solar Panels, Inverters, Installation"
+                id="email"
+                type="email"
+                {...register('email')}
+                placeholder="customer@example.com"
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                {...register('phone')}
+                placeholder="+91 98765 43210"
               />
             </div>
 
@@ -146,16 +152,6 @@ export default function VendorForm() {
               />
             </div>
 
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                {...register('notes')}
-                placeholder="Add any additional notes about this vendor..."
-                rows={4}
-              />
-            </div>
 
             {/* Actions */}
             <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
@@ -169,14 +165,14 @@ export default function VendorForm() {
               </Button>
               <Button
                 type="submit"
-                disabled={createVendor.isPending || updateVendor.isPending}
+                disabled={createCustomer.isPending || updateCustomer.isPending}
                 className="w-full sm:w-auto"
               >
-                {createVendor.isPending || updateVendor.isPending
+                {createCustomer.isPending || updateCustomer.isPending
                   ? 'Saving...'
                   : isEditMode
-                  ? 'Update Vendor'
-                  : 'Create Vendor'}
+                  ? 'Update Customer'
+                  : 'Create Customer'}
               </Button>
             </div>
           </form>

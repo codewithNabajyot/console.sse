@@ -5,16 +5,14 @@ import { ArrowLeft } from 'lucide-react'
 import { useBankAccount, useCreateBankAccount, useUpdateBankAccount } from '@/hooks/useBankAccounts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import type { BankAccountInput } from '@/lib/types'
 
 type FormData = {
   account_name: string
   bank_name: string
   account_number: string
-  notes: string
 }
 
 export default function BankAccountForm() {
@@ -36,7 +34,6 @@ export default function BankAccountForm() {
       account_name: '',
       bank_name: '',
       account_number: '',
-      notes: '',
     },
   })
 
@@ -47,7 +44,6 @@ export default function BankAccountForm() {
         account_name: bankAccount.account_name,
         bank_name: bankAccount.bank_name || '',
         account_number: bankAccount.account_number || '',
-        notes: bankAccount.notes?.map(n => n.text).join('\n') || '',
       })
     }
   }, [bankAccount, reset])
@@ -57,7 +53,6 @@ export default function BankAccountForm() {
       account_name: data.account_name,
       bank_name: data.bank_name || null,
       account_number: data.account_number || null,
-      notes: data.notes ? [{ text: data.notes, timestamp: new Date().toISOString() }] : [],
     }
 
     try {
@@ -131,13 +126,7 @@ export default function BankAccountForm() {
 
       {/* Form */}
       <Card>
-        <CardHeader>
-          <CardTitle>Bank Account Information</CardTitle>
-          <CardDescription>
-            Enter the bank account details below. Fields marked with * are required.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Account Name */}
             <div className="space-y-2">
@@ -174,16 +163,6 @@ export default function BankAccountForm() {
               />
             </div>
 
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                {...register('notes')}
-                placeholder="Add any additional notes about this bank account..."
-                rows={4}
-              />
-            </div>
 
             {/* Actions */}
             <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">

@@ -2,58 +2,71 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Vendor, VendorInput } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
-
-const ORG_ID = '00000000-0000-0000-0000-000000000000' // Placeholder - will be replaced with actual org context
+import { useAuth } from '@/contexts/AuthContext'
 
 // Fetch all vendors (excluding soft-deleted)
 export function useVendors() {
+  const { profile } = useAuth()
+  const orgId = profile?.org_id
+
   return useQuery({
-    queryKey: ['vendors'],
+    queryKey: ['vendors', orgId],
     queryFn: async () => {
+      if (!orgId) throw new Error('Organization ID is required')
+      
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
-        .eq('org_id', ORG_ID)
+        .eq('org_id', orgId)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
 
       if (error) throw error
       return data as Vendor[]
     },
+    enabled: !!orgId,
   })
 }
 
 // Get single vendor by ID
 export function useVendor(id: string | undefined) {
+  const { profile } = useAuth()
+  const orgId = profile?.org_id
+
   return useQuery({
-    queryKey: ['vendors', id],
+    queryKey: ['vendors', orgId, id],
     queryFn: async () => {
       if (!id) throw new Error('Vendor ID is required')
+      if (!orgId) throw new Error('Organization ID is required')
       
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
         .eq('id', id)
-        .eq('org_id', ORG_ID)
+        .eq('org_id', orgId)
         .is('deleted_at', null)
         .single()
 
       if (error) throw error
       return data as Vendor
     },
-    enabled: !!id,
+    enabled: !!id && !!orgId,
   })
 }
 
 // Create vendor mutation
 export function useCreateVendor() {
   const queryClient = useQueryClient()
+  const { profile } = useAuth()
+  const orgId = profile?.org_id
 
   return useMutation({
     mutationFn: async (input: VendorInput) => {
+      if (!orgId) throw new Error('Organization ID is required')
+      
       const { data, error } = await supabase
         .from('vendors')
-        .insert([{ ...input, org_id: ORG_ID }])
+        .insert([{ ...input, org_id: orgId }])
         .select()
         .single()
 
@@ -61,7 +74,7 @@ export function useCreateVendor() {
       return data as Vendor
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendors'] })
+      queryClient.invalidateQueries({ queryKey: ['vendors', orgId] })
       toast.success('Vendor created successfully')
     },
     onError: (error: Error) => {
@@ -73,23 +86,27 @@ export function useCreateVendor() {
 // Update vendor mutation
 export function useUpdateVendor() {
   const queryClient = useQueryClient()
+  const { profile } = useAuth()
+  const orgId = profile?.org_id
 
   return useMutation({
-    mutationFn: async ({ id, input }: { id: string; input: Partial<VendorInput> }) => {
+    mutationFn: async ({ id, input }: { id: string; input: Partial<VendorInput>; successMessage?: string }) => {
+      if (!orgId) throw new Error('Organization ID is required')
+      
       const { data, error } = await supabase
         .from('vendors')
         .update(input)
         .eq('id', id)
-        .eq('org_id', ORG_ID)
+        .eq('org_id', orgId)
         .select()
         .single()
 
       if (error) throw error
       return data as Vendor
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendors'] })
-      toast.success('Vendor updated successfully')
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendors', orgId] })
+      toast.success(variables.successMessage || 'Vendor updated successfully')
     },
     onError: (error: Error) => {
       toast.error('Failed to update vendor', error.message)
@@ -100,14 +117,18 @@ export function useUpdateVendor() {
 // Soft delete vendor mutation
 export function useDeleteVendor() {
   const queryClient = useQueryClient()
+  const { profile } = useAuth()
+  const orgId = profile?.org_id
 
   return useMutation({
     mutationFn: async (id: string) => {
+      if (!orgId) throw new Error('Organization ID is required')
+      
       const { data, error } = await supabase
         .from('vendors')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
-        .eq('org_id', ORG_ID)
+        .eq('org_id', orgId)
         .select()
         .single()
 
@@ -115,7 +136,7 @@ export function useDeleteVendor() {
       return data as Vendor
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendors'] })
+      queryClient.invalidateQueries({ queryKey: ['vendors', orgId] })
       toast.success('Vendor deleted successfully')
     },
     onError: (error: Error) => {

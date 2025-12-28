@@ -8,10 +8,13 @@ import Projects from './pages/Projects'
 import Invoices from './pages/Invoices'
 import Income from './pages/Income'
 import Expenses from './pages/Expenses'
-import Customers from './pages/Customers'
-import Vendors from './pages/Vendors'
-import BankAccounts from './pages/BankAccounts'
-import { DashboardLayout } from './components/layout/DashboardLayout'
+import Customers from './pages/customers/Customers'
+import CustomerForm from './pages/customers/CustomerForm'
+import Vendors from './pages/vendors/Vendors'
+import VendorForm from './pages/vendors/VendorForm'
+import BankAccounts from './pages/bank-accounts/BankAccounts'
+import BankAccountForm from './pages/bank-accounts/BankAccountForm'
+import { Layout } from './components/Layout'
 
 import { useAuth } from './contexts/AuthContext'
 
@@ -29,7 +32,7 @@ function App() {
         path="/:orgSlug"
         element={
           <ProtectedRoute>
-            <DashboardLayout />
+            <Layout />
           </ProtectedRoute>
         }
       >
@@ -40,8 +43,16 @@ function App() {
         <Route path="income" element={<Income />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="customers" element={<Customers />} />
+        <Route path="customers/new" element={<CustomerForm />} />
+        <Route path="customers/:id/edit" element={<CustomerForm />} />
+
         <Route path="vendors" element={<Vendors />} />
+        <Route path="vendors/new" element={<VendorForm />} />
+        <Route path="vendors/:id/edit" element={<VendorForm />} />
+
         <Route path="bank-accounts" element={<BankAccounts />} />
+        <Route path="bank-accounts/new" element={<BankAccountForm />} />
+        <Route path="bank-accounts/:id/edit" element={<BankAccountForm />} />
       </Route>
 
       {/* Root redirect to default org or user org */}

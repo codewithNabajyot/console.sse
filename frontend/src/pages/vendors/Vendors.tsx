@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Search } from 'lucide-react'
-import { useBankAccounts, useDeleteBankAccount } from '@/hooks/useBankAccounts'
+import { useVendors, useDeleteVendor, useUpdateVendor } from '@/hooks/useVendors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import type { Note } from '@/lib/types'
+import { NotesManager } from '@/components/NotesManager'
 import {
   Table,
   TableBody,
@@ -26,34 +27,26 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 
-export default function BankAccounts() {
+export default function Vendors() {
   const { orgSlug } = useParams()
   const [searchQuery, setSearchQuery] = useState('')
-  const { data: bankAccounts, isLoading } = useBankAccounts()
-  const deleteBankAccount = useDeleteBankAccount()
+  const { data: vendors, isLoading } = useVendors()
+  const deleteVendor = useDeleteVendor()
+  const updateVendor = useUpdateVendor()
 
-  const filteredBankAccounts = bankAccounts?.filter((account) =>
-    account.account_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    account.bank_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    account.account_number?.includes(searchQuery)
+  const filteredVendors = vendors?.filter((vendor) =>
+    vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    vendor.category?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const handleDelete = (id: string) => {
-    deleteBankAccount.mutate(id)
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-    }).format(amount)
+    deleteVendor.mutate(id)
   }
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Loading bank accounts...</div>
+        <div className="text-muted-foreground">Loading vendors...</div>
       </div>
     )
   }
@@ -63,15 +56,15 @@ export default function BankAccounts() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bank Accounts</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Vendors</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your bank accounts and track balances
+            Manage your vendor database
           </p>
         </div>
         <Button asChild>
-          <Link to={`/${orgSlug}/bank-accounts/new`}>
+          <Link to={`/${orgSlug}/vendors/new`}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Bank Account
+            Add Vendor
           </Link>
         </Button>
       </div>
@@ -80,7 +73,7 @@ export default function BankAccounts() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search by account name, bank, or account number..."
+          placeholder="Search vendors by name or category..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10"
@@ -94,39 +87,45 @@ export default function BankAccounts() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Account Name</TableHead>
-                  <TableHead>Bank Name</TableHead>
-                  <TableHead>Account Number</TableHead>
-                  <TableHead className="text-right">Current Balance</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>GST Number</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBankAccounts?.length === 0 ? (
+                {filteredVendors?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No bank accounts found. Create your first bank account to get started.
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      No vendors found. Create your first vendor to get started.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredBankAccounts?.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium">{account.account_name}</TableCell>
-                      <TableCell>{account.bank_name || '—'}</TableCell>
-                      <TableCell>{account.account_number || '—'}</TableCell>
+                  filteredVendors?.map((vendor) => (
+                    <TableRow key={vendor.id}>
+                      <TableCell className="font-medium">{vendor.name}</TableCell>
+                      <TableCell>{vendor.category || '—'}</TableCell>
+                      <TableCell>{vendor.gst_number || '—'}</TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={account.current_balance >= 0 ? 'success' : 'destructive'}>
-                          {formatCurrency(account.current_balance)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 text-primary">
+                          <NotesManager
+                            notes={vendor.notes}
+                            onUpdate={async (newNotes: Note[], message: string) => {
+                              await updateVendor.mutateAsync({
+                                id: vendor.id,
+                                input: { notes: newNotes },
+                                successMessage: message
+                              })
+                            }}
+                            title={`Notes for ${vendor.name}`}
+                            entityName={vendor.name}
+                          />
                           <Button
                             variant="ghost"
                             size="icon"
                             asChild
                           >
-                            <Link to={`/${orgSlug}/bank-accounts/${account.id}/edit`}>
+                            <Link to={`/${orgSlug}/vendors/${vendor.id}/edit`}>
                               <Pencil className="h-4 w-4" />
                             </Link>
                           </Button>
@@ -138,15 +137,15 @@ export default function BankAccounts() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Bank Account</AlertDialogTitle>
+                                <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete {account.account_name}? This action cannot be undone.
+                                  Are you sure you want to delete {vendor.name}? This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => handleDelete(account.id)}
+                                  onClick={() => handleDelete(vendor.id)}
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
                                   Delete
@@ -167,21 +166,33 @@ export default function BankAccounts() {
 
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4">
-        {filteredBankAccounts?.length === 0 ? (
+        {filteredVendors?.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground">
-              No bank accounts found. Create your first bank account to get started.
+              No vendors found. Create your first vendor to get started.
             </CardContent>
           </Card>
         ) : (
-          filteredBankAccounts?.map((account) => (
-            <Card key={account.id}>
+          filteredVendors?.map((vendor) => (
+            <Card key={vendor.id}>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center justify-between">
-                  <span>{account.account_name}</span>
-                  <div className="flex gap-2">
+                  <span>{vendor.name}</span>
+                  <div className="flex gap-1 items-center">
+                    <NotesManager
+                      notes={vendor.notes}
+                      onUpdate={async (newNotes: Note[], message: string) => {
+                        await updateVendor.mutateAsync({
+                          id: vendor.id,
+                          input: { notes: newNotes },
+                          successMessage: message
+                        })
+                      }}
+                      title={`Notes for ${vendor.name}`}
+                      entityName={vendor.name}
+                    />
                     <Button variant="ghost" size="icon" asChild>
-                      <Link to={`/${orgSlug}/bank-accounts/${account.id}/edit`}>
+                      <Link to={`/${orgSlug}/vendors/${vendor.id}/edit`}>
                         <Pencil className="h-4 w-4" />
                       </Link>
                     </Button>
@@ -193,15 +204,15 @@ export default function BankAccounts() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Bank Account</AlertDialogTitle>
+                          <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete {account.account_name}? This action cannot be undone.
+                            Are you sure you want to delete {vendor.name}? This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDelete(account.id)}
+                            onClick={() => handleDelete(vendor.id)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
                             Delete
@@ -213,24 +224,18 @@ export default function BankAccounts() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                {account.bank_name && (
+                {vendor.category && (
                   <div>
-                    <span className="text-muted-foreground">Bank:</span>{' '}
-                    <span>{account.bank_name}</span>
+                    <span className="text-muted-foreground">Category:</span>{' '}
+                    <span>{vendor.category}</span>
                   </div>
                 )}
-                {account.account_number && (
+                {vendor.gst_number && (
                   <div>
-                    <span className="text-muted-foreground">Account Number:</span>{' '}
-                    <span>{account.account_number}</span>
+                    <span className="text-muted-foreground">GST:</span>{' '}
+                    <span>{vendor.gst_number}</span>
                   </div>
                 )}
-                <div>
-                  <span className="text-muted-foreground">Balance:</span>{' '}
-                  <Badge variant={account.current_balance >= 0 ? 'success' : 'destructive'}>
-                    {formatCurrency(account.current_balance)}
-                  </Badge>
-                </div>
               </CardContent>
             </Card>
           ))
