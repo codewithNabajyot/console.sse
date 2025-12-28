@@ -4,7 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
-import Projects from './pages/Projects'
+import Projects from './pages/projects/Projects'
+import ProjectForm from './pages/projects/ProjectForm'
 import Invoices from './pages/Invoices'
 import Income from './pages/Income'
 import Expenses from './pages/Expenses'
@@ -39,6 +40,8 @@ function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
+        <Route path="projects/new" element={<ProjectForm />} />
+        <Route path="projects/:id/edit" element={<ProjectForm />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="income" element={<Income />} />
         <Route path="expenses" element={<Expenses />} />

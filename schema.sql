@@ -47,6 +47,7 @@ CREATE TABLE master_configs (
     label TEXT NOT NULL,
     value TEXT NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
+    sort_order INTEGER DEFAULT 0,
     notes JSONB DEFAULT '[]'::jsonb,
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -344,6 +345,49 @@ FROM organizations o
 WHERE o.slug = 'suryasathi'
 ON CONFLICT DO NOTHING;
 
+-- Seed Master Configs (Project Statuses)
+INSERT INTO master_configs (org_id, config_type, label, value, is_active)
+SELECT 
+  o.id,
+  'PROJECT_STATUS',
+  status,
+  status,
+  true,
+  t.sort_order
+FROM organizations o
+CROSS JOIN (
+  VALUES 
+    ('Booking', 1),
+    ('MNRE Submitted', 2),
+    ('Loan Applied', 3),
+    ('Loan Approved', 4),
+    ('Installation', 5),
+    ('Net Metering Done', 6),
+    ('Central Subsidy', 7),
+    ('State Subsidy', 8),
+    ('Completed', 9)
+) AS t(status, sort_order)
+WHERE o.slug = 'suryasathi'
+ON CONFLICT DO NOTHING;
+
+-- Seed Master Configs (Funding Types)
+INSERT INTO master_configs (org_id, config_type, label, value, is_active)
+SELECT 
+  o.id,
+  'FUNDING_TYPE',
+  ftype,
+  ftype,
+  true,
+  t.sort_order
+FROM organizations o
+CROSS JOIN (
+  VALUES 
+    ('Cash', 1),
+    ('Loan', 2)
+) AS t(ftype, sort_order)
+WHERE o.slug = 'suryasathi'
+ON CONFLICT DO NOTHING;
+
 -- 7. AUTO-CREATE USER PROFILE TRIGGER
 
 -- Function to automatically create a profile when a user signs up
@@ -413,6 +457,9 @@ CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE TO authentic
 
 -- Org Roles: Org-specific access
 CREATE POLICY "Users can read org roles" ON org_roles FOR SELECT TO authenticated USING (org_id = get_user_org_id());
+
+-- Master Configs: Org-specific access
+CREATE POLICY "Users can manage master configs" ON master_configs FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
 
 -- Entity Data Policies (Org-specific)
 CREATE POLICY "Users can manage projects" ON projects FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
