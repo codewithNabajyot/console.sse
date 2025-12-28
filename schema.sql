@@ -301,3 +301,93 @@ CREATE TRIGGER update_income_updated BEFORE UPDATE ON income FOR EACH ROW EXECUT
 CREATE TRIGGER update_customers_updated BEFORE UPDATE ON customers FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_vendors_updated BEFORE UPDATE ON vendors FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_banks_updated BEFORE UPDATE ON bank_accounts FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- 6. SEED DATA - DEFAULT ORGANIZATION AND ROLES
+
+-- Create default organization
+INSERT INTO organizations (name, slug, notes)
+VALUES ('Suryasathi Solar', 'suryasathi', '[]'::jsonb)
+ON CONFLICT (slug) DO NOTHING;
+
+-- Create default roles
+INSERT INTO org_roles (org_id, name, permissions)
+SELECT 
+  o.id,
+  'Admin',
+  '{
+    "projects": {"create": true, "read": true, "update": true, "delete": true},
+    "invoices": {"create": true, "read": true, "update": true, "delete": true},
+    "income": {"create": true, "read": true, "update": true, "delete": true},
+    "expenses": {"create": true, "read": true, "update": true, "delete": true},
+    "customers": {"create": true, "read": true, "update": true, "delete": true},
+    "vendors": {"create": true, "read": true, "update": true, "delete": true},
+    "bank_accounts": {"create": true, "read": true, "update": true, "delete": true}
+  }'::jsonb
+FROM organizations o
+WHERE o.slug = 'suryasathi'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO org_roles (org_id, name, permissions)
+SELECT 
+  o.id,
+  'Read Only',
+  '{
+    "projects": {"create": false, "read": true, "update": false, "delete": false},
+    "invoices": {"create": false, "read": true, "update": false, "delete": false},
+    "income": {"create": false, "read": true, "update": false, "delete": false},
+    "expenses": {"create": false, "read": true, "update": false, "delete": false},
+    "customers": {"create": false, "read": true, "update": false, "delete": false},
+    "vendors": {"create": false, "read": true, "update": false, "delete": false},
+    "bank_accounts": {"create": false, "read": true, "update": false, "delete": false}
+  }'::jsonb
+FROM organizations o
+WHERE o.slug = 'suryasathi'
+ON CONFLICT DO NOTHING;
+
+-- 7. AUTO-CREATE USER PROFILE TRIGGER
+
+-- Function to automatically create a profile when a user signs up
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+  default_org_id UUID;
+  read_only_role_id UUID;
+BEGIN
+  -- Get the default organization (Suryasathi)
+  SELECT id INTO default_org_id 
+  FROM public.organizations 
+  WHERE slug = 'suryasathi' 
+  LIMIT 1;
+
+  -- Get the Read Only role ID
+  SELECT id INTO read_only_role_id 
+  FROM public.org_roles 
+  WHERE org_id = default_org_id AND name = 'Read Only' 
+  LIMIT 1;
+
+  -- Create profile for the new user
+  INSERT INTO public.profiles (id, org_id, role_id, full_name)
+  VALUES (
+    NEW.id,
+    default_org_id,
+    read_only_role_id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email)
+  );
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger on auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 8. COMMENTS FOR DOCUMENTATION
+
+COMMENT ON TABLE organizations IS 'Multi-tenant organizations. Default: Suryasathi Solar';
+COMMENT ON TABLE org_roles IS 'Role-based access control. Default roles: Admin, Read Only';
+COMMENT ON TABLE profiles IS 'User profiles linked to auth.users. Auto-created on signup with Read Only role';
+COMMENT ON FUNCTION handle_new_user() IS 'Automatically creates a profile for new users and assigns them to the default organization with Read Only role';
+COMMENT ON COLUMN bank_accounts.current_balance IS 'Cached real-time balance maintained by triggers on income/expenses tables';

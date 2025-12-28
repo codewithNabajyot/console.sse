@@ -4,13 +4,16 @@ import {
   BarChart3, 
   PlusCircle, 
   Receipt, 
-  Settings, 
   Wallet,
   LayoutDashboard,
   FolderKanban,
   FileText,
   Menu,
-  Bell
+  Bell,
+  Users,
+  Building2,
+  Landmark,
+  LogOut
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -20,13 +23,38 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { ModeToggle } from '@/components/ModeToggle'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/contexts/AuthContext'
 
 export const DashboardLayout: React.FC = () => {
   const { orgSlug } = useParams()
   const location = useLocation()
   const [isMoreOpen, setIsMoreOpen] = React.useState(false)
+  const { user, signOut } = useAuth()
+
+  // Get user initials from email or name
+  const getUserInitials = () => {
+    if (!user) return 'U'
+    const email = user.email || ''
+    const parts = email.split('@')[0].split('.')
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase()
+    }
+    return email.substring(0, 2).toUpperCase()
+  }
+
+  const handleSignOut = async () => {
+    await signOut()
+  }
 
   const navItems = [
     { label: 'Home', icon: LayoutDashboard, href: `/${orgSlug}/dashboard` },
@@ -36,6 +64,9 @@ export const DashboardLayout: React.FC = () => {
     { label: 'Quick Add', icon: PlusCircle, href: `/${orgSlug}/add`, primary: true },
     { label: 'Expenses', icon: Receipt, href: `/${orgSlug}/expenses` },
     { label: 'Stats', icon: BarChart3, href: `/${orgSlug}/stats` },
+    { label: 'Customers', icon: Users, href: `/${orgSlug}/customers` },
+    { label: 'Vendors', icon: Building2, href: `/${orgSlug}/vendors` },
+    { label: 'Bank Accounts', icon: Landmark, href: `/${orgSlug}/bank-accounts` },
   ]
 
   const mobileBottomItems = ['Home', 'Projects', 'Quick Add']
@@ -60,9 +91,32 @@ export const DashboardLayout: React.FC = () => {
               <Bell className="h-[1.2rem] w-[1.2rem] text-muted-foreground" />
             </Button>
             <ModeToggle />
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
-              <Settings className="h-[1.2rem] w-[1.2rem] text-muted-foreground" />
-            </Button>
+            
+            {/* User Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-primary/10 hover:bg-primary/20">
+                  <span className="text-sm font-semibold text-primary">
+                    {getUserInitials()}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">Account</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user?.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600 cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
