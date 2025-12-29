@@ -18,6 +18,8 @@ import Vendors from './pages/vendors/Vendors'
 import VendorForm from './pages/vendors/VendorForm'
 import BankAccounts from './pages/bank-accounts/BankAccounts'
 import BankAccountForm from './pages/bank-accounts/BankAccountForm'
+import GSTSummary from './pages/stats/GSTSummary'
+import BankTransactions from './pages/stats/BankTransactions'
 import { Layout } from './components/Layout'
 
 import { useAuth } from './contexts/AuthContext'
@@ -65,6 +67,10 @@ function App() {
         <Route path="bank-accounts" element={<BankAccounts />} />
         <Route path="bank-accounts/new" element={<BankAccountForm />} />
         <Route path="bank-accounts/:id/edit" element={<BankAccountForm />} />
+
+        {/* Stats */}
+        <Route path="stats/gst" element={<GSTSummary />} />
+        <Route path="stats/bank" element={<BankTransactions />} />
       </Route>
 
       {/* Root redirect to default org or user org */}
