@@ -129,3 +129,23 @@ export interface Expense {
 }
 
 export type ExpenseInput = Omit<Expense, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'vendor' | 'bank_account'> & { notes?: Note[] }
+
+export interface Invoice {
+  id: string
+  org_id: string
+  project_id: string | null
+  project?: Project
+  date: string
+  invoice_number: string
+  taxable_value: number
+  gst_percentage: number
+  gst_amount: number
+  total_amount: number
+  invoice_link: string | null
+  notes: Note[]
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type InvoiceInput = Omit<Invoice, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project'> & { notes?: Note[] }
