@@ -75,10 +75,17 @@ export const Layout: React.FC = () => {
     { label: 'Income', icon: Wallet, href: `/${orgSlug}/income` },
     { label: 'Quick Add', icon: PlusCircle, href: `/${orgSlug}/add`, primary: true },
     { label: 'Expenses', icon: Receipt, href: `/${orgSlug}/expenses` },
-    { label: 'Stats', icon: BarChart3, href: `/${orgSlug}/stats` },
     { label: 'Customers', icon: Users, href: `/${orgSlug}/customers` },
     { label: 'Vendors', icon: Building2, href: `/${orgSlug}/vendors` },
     { label: 'Bank Accounts', icon: Landmark, href: `/${orgSlug}/bank-accounts` },
+    { 
+      label: 'Stats', 
+      icon: BarChart3, 
+      children: [
+        { label: 'GST Summary', href: `/${orgSlug}/stats/gst` },
+        { label: 'Bank Statement', href: `/${orgSlug}/stats/bank` },
+      ]
+    },
   ]
 
   const mobileBottomItems = ['Home', 'Projects', 'Quick Add']
@@ -153,13 +160,53 @@ export const Layout: React.FC = () => {
           {navItems.map((item) => {
             if (item.primary) return null;
             
-            const isActive = location.pathname === item.href
+            const isActive = location.pathname === item.href || (item.children?.some(child => location.pathname === child.href))
             const Icon = item.icon
+            const hasChildren = !!item.children
+
+            if (hasChildren) {
+              return (
+                <div key={item.label} className="flex flex-col gap-1">
+                  <div
+                    className={cn(
+                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-default",
+                      isActive 
+                        ? "text-primary bg-primary/5" 
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                      {item.label}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 ml-9 border-l border-border pl-2">
+                    {item.children?.map((child) => {
+                      const isChildActive = location.pathname === child.href
+                      return (
+                        <Link
+                          key={child.href}
+                          to={child.href}
+                          className={cn(
+                            "px-3 py-2 rounded-lg text-xs font-medium transition-all",
+                            isChildActive
+                              ? "bg-primary/10 text-primary dark:bg-primary/20"
+                              : "text-muted-foreground hover:bg-muted dark:hover:bg-muted/50"
+                          )}
+                        >
+                          {child.label}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            }
 
             return (
               <Link
-                key={item.href}
-                to={item.href}
+                key={item.href || item.label}
+                to={item.href || `/${orgSlug}`}
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                   isActive 
@@ -250,8 +297,8 @@ export const Layout: React.FC = () => {
 
           return (
             <Link
-              key={item.href}
-              to={item.href}
+              key={item.href || item.label}
+              to={item.href || `/${orgSlug}`}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 min-w-[50px] transition-colors",
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
@@ -277,20 +324,41 @@ export const Layout: React.FC = () => {
             </SheetHeader>
             <div className="grid grid-cols-2 gap-4">
               {moreItems.map((item) => (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  onClick={() => setIsMoreOpen(false)}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-4 rounded-2xl gap-2 transition-all active:scale-95",
-                    location.pathname === item.href 
-                      ? "bg-primary/10 text-primary border border-primary/20" 
-                      : "bg-muted/50 dark:bg-muted/20 text-foreground"
+                <React.Fragment key={item.label}>
+                  {item.children ? (
+                    item.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        to={child.href}
+                        onClick={() => setIsMoreOpen(false)}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-4 rounded-2xl gap-2 transition-all active:scale-95",
+                          location.pathname === child.href 
+                            ? "bg-primary/10 text-primary border border-primary/20" 
+                            : "bg-muted/50 dark:bg-muted/20 text-foreground"
+                        )}
+                      >
+                        <item.icon className="h-6 w-6" />
+                        <span className="text-xs font-medium text-center">{child.label}</span>
+                      </Link>
+                    ))
+                  ) : (
+                    <Link
+                      key={item.label}
+                      to={(item.href || '#') as string}
+                      onClick={() => setIsMoreOpen(false)}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-4 rounded-2xl gap-2 transition-all active:scale-95",
+                        location.pathname === item.href 
+                          ? "bg-primary/10 text-primary border border-primary/20" 
+                          : "bg-muted/50 dark:bg-muted/20 text-foreground"
+                      )}
+                    >
+                      <item.icon className="h-6 w-6" />
+                      <span className="text-xs font-medium">{item.label}</span>
+                    </Link>
                   )}
-                >
-                  <item.icon className="h-6 w-6" />
-                  <span className="text-xs font-medium">{item.label}</span>
-                </Link>
+                </React.Fragment>
               ))}
             </div>
           </SheetContent>
