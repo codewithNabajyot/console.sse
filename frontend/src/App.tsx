@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Projects from './pages/projects/Projects'
 import ProjectForm from './pages/projects/ProjectForm'
 import Invoices from './pages/Invoices'
+import InvoiceForm from './pages/invoices/InvoiceForm'
 import IncomeList from './pages/income/IncomeList'
 import IncomeForm from './pages/income/IncomeForm'
 import ExpenseList from './pages/expenses/ExpenseList'
@@ -45,6 +46,8 @@ function App() {
         <Route path="projects/new" element={<ProjectForm />} />
         <Route path="projects/:id/edit" element={<ProjectForm />} />
         <Route path="invoices" element={<Invoices />} />
+        <Route path="invoices/new" element={<InvoiceForm />} />
+        <Route path="invoices/:id/edit" element={<InvoiceForm />} />
         <Route path="income" element={<IncomeList />} />
         <Route path="income/new" element={<IncomeForm />} />
         <Route path="income/:id/edit" element={<IncomeForm />} />

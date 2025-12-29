@@ -1,20 +1,249 @@
+import { useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { useInvoices, useDeleteInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { NotesManager } from '@/components/NotesManager'
+import type { Note } from '@/lib/types'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { format } from 'date-fns'
+import { MobileTransactionCard } from '@/components/MobileTransactionCard'
+
 export default function Invoices() {
+  const { orgSlug } = useParams()
+  const [searchQuery, setSearchQuery] = useState('')
+  const { data: invoices, isLoading } = useInvoices()
+  const deleteInvoice = useDeleteInvoice()
+  const updateInvoice = useUpdateInvoice()
+
+  const filteredInvoices = invoices?.filter((invoice) => {
+    const searchMatch = 
+      invoice.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      invoice.project?.project_id_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      invoice.project?.customer?.name.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    return searchMatch
+  })
+
+  const handleDelete = (id: string) => {
+    deleteInvoice.mutate(id)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-muted-foreground">Loading invoices...</div>
+      </div>
+    )
+  }
+
   return (
-    <div>
-      <div className="mb-8 flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-          <p className="mt-2 text-gray-600">Track your sales invoices</p>
+          <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
+          <p className="text-muted-foreground mt-1">
+            Track and manage sales invoices
+          </p>
         </div>
-        <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-          Create Invoice
-        </button>
+        <Button asChild>
+          <Link to={`/${orgSlug}/invoices/new`}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Invoice
+          </Link>
+        </Button>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6">
-          <p className="text-gray-500">No invoices found.</p>
+      <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by invoice #, project, or customer..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
         </div>
+      </div>
+
+      <div className="hidden md:block">
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Invoice #</TableHead>
+                  <TableHead>Project / Customer</TableHead>
+                  <TableHead>Taxable Value</TableHead>
+                  <TableHead>GST</TableHead>
+                  <TableHead>Total Amount</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredInvoices?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No invoices found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredInvoices?.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium">
+                        {format(new Date(invoice.date), 'dd MMM yyyy')}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-sm font-semibold">{invoice.invoice_number}</span>
+                      </TableCell>
+                      <TableCell>
+                        {invoice.project ? (
+                          <div className="flex flex-col">
+                            <span className="font-mono text-xs font-semibold">{invoice.project.project_id_code}</span>
+                            <span className="text-sm">{invoice.project.customer?.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic">No Project</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        ₹{invoice.taxable_value.toLocaleString('en-IN')}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{invoice.gst_percentage}%</Badge>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          ₹{invoice.gst_amount.toLocaleString('en-IN')}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold text-green-600">
+                        ₹{invoice.total_amount.toLocaleString('en-IN')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2 text-primary">
+                          <NotesManager
+                            notes={invoice.notes}
+                            onUpdate={async (newNotes: Note[]) => {
+                              await updateInvoice.mutateAsync({
+                                id: invoice.id,
+                                input: { notes: newNotes }
+                              })
+                            }}
+                            title={`Notes for Invoice ${invoice.invoice_number}`}
+                            entityName={`Invoice ${invoice.invoice_number}`}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            asChild
+                          >
+                            <Link to={`/${orgSlug}/invoices/${invoice.id}/edit`}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete invoice {invoice.invoice_number} of ₹{invoice.total_amount.toLocaleString('en-IN')}? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(invoice.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="md:hidden space-y-4">
+        {filteredInvoices?.map((invoice) => (
+          <MobileTransactionCard
+            key={invoice.id}
+            title={format(new Date(invoice.date), 'dd MMM yyyy')}
+            badge={<Badge variant="outline">{invoice.invoice_number}</Badge>}
+            fields={[
+              { 
+                label: 'Project', 
+                value: invoice.project ? (
+                  <div className="flex flex-col items-end">
+                    <span className="font-mono text-xs">{invoice.project.project_id_code}</span>
+                    <span className="text-xs text-muted-foreground">{invoice.project.customer?.name}</span>
+                  </div>
+                ) : 'No Project'
+              },
+              {
+                label: 'Taxable Value',
+                value: `₹${invoice.taxable_value.toLocaleString('en-IN')}`
+              },
+              {
+                label: 'GST',
+                value: `${invoice.gst_percentage}% (₹${invoice.gst_amount.toLocaleString('en-IN')})`
+              },
+              { 
+                label: 'Total', 
+                value: `₹${invoice.total_amount.toLocaleString('en-IN')}`, 
+                className: 'text-green-600 font-bold' 
+              }
+            ]}
+            notesProps={{
+              notes: invoice.notes,
+              onUpdate: async (newNotes) => {
+                await updateInvoice.mutateAsync({
+                  id: invoice.id,
+                  input: { notes: newNotes }
+                })
+              },
+              title: `Notes for Invoice ${invoice.invoice_number}`,
+              entityName: `Invoice ${invoice.invoice_number}`
+            }}
+            editLink={`/${orgSlug}/invoices/${invoice.id}/edit`}
+            onDelete={() => handleDelete(invoice.id)}
+            deleteTitle="Delete Invoice"
+            deleteDescription={`Are you sure you want to delete invoice ${invoice.invoice_number} of ₹${invoice.total_amount.toLocaleString('en-IN')}?`}
+          />
+        ))}
       </div>
     </div>
   )
