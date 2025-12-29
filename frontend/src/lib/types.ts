@@ -84,3 +84,48 @@ export interface Project {
 export type MasterConfigInput = Omit<MasterConfig, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes'> & { notes?: Note[] }
 
 export type ProjectInput = Omit<Project, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'customer'> & { notes?: Note[] }
+
+export interface Income {
+  id: string
+  org_id: string
+  project_id: string | null
+  project?: Project
+  bank_account_id: string | null
+  bank_account?: BankAccount
+  date: string
+  received_from: string | null
+  category: string | null
+  payment_mode: string | null
+  amount: number
+  notes: Note[]
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type IncomeInput = Omit<Income, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'bank_account'> & { notes?: Note[] }
+
+export interface Expense {
+  id: string
+  org_id: string
+  project_id: string | null
+  project?: Project
+  vendor_id: string | null
+  vendor?: Vendor
+  bank_account_id: string | null
+  bank_account?: BankAccount
+  date: string
+  description: string | null
+  category: string | null
+  total_paid: number
+  gst_percentage: number
+  gst_amount: number
+  taxable_value: number
+  vendor_invoice_number: string | null
+  notes: Note[]
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ExpenseInput = Omit<Expense, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'vendor' | 'bank_account'> & { notes?: Note[] }
