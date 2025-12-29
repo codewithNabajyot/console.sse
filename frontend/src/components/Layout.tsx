@@ -205,8 +205,8 @@ export const Layout: React.FC = () => {
 
             return (
               <Link
-                key={item.href}
-                to={item.href}
+                key={item.href || item.label}
+                to={item.href || `/${orgSlug}`}
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                   isActive 
@@ -297,8 +297,8 @@ export const Layout: React.FC = () => {
 
           return (
             <Link
-              key={item.href}
-              to={item.href}
+              key={item.href || item.label}
+              to={item.href || `/${orgSlug}`}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 min-w-[50px] transition-colors",
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
