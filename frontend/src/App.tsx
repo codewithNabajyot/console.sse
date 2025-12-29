@@ -7,8 +7,10 @@ import Dashboard from './pages/Dashboard'
 import Projects from './pages/projects/Projects'
 import ProjectForm from './pages/projects/ProjectForm'
 import Invoices from './pages/Invoices'
-import Income from './pages/Income'
-import Expenses from './pages/Expenses'
+import IncomeList from './pages/income/IncomeList'
+import IncomeForm from './pages/income/IncomeForm'
+import ExpenseList from './pages/expenses/ExpenseList'
+import ExpenseForm from './pages/expenses/ExpenseForm'
 import Customers from './pages/customers/Customers'
 import CustomerForm from './pages/customers/CustomerForm'
 import Vendors from './pages/vendors/Vendors'
@@ -43,8 +45,12 @@ function App() {
         <Route path="projects/new" element={<ProjectForm />} />
         <Route path="projects/:id/edit" element={<ProjectForm />} />
         <Route path="invoices" element={<Invoices />} />
-        <Route path="income" element={<Income />} />
-        <Route path="expenses" element={<Expenses />} />
+        <Route path="income" element={<IncomeList />} />
+        <Route path="income/new" element={<IncomeForm />} />
+        <Route path="income/:id/edit" element={<IncomeForm />} />
+        <Route path="expenses" element={<ExpenseList />} />
+        <Route path="expenses/new" element={<ExpenseForm />} />
+        <Route path="expenses/:id/edit" element={<ExpenseForm />} />
         <Route path="customers" element={<Customers />} />
         <Route path="customers/new" element={<CustomerForm />} />
         <Route path="customers/:id/edit" element={<CustomerForm />} />
