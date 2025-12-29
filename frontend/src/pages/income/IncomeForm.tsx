@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { useIncomeById, useCreateIncome, useUpdateIncome } from '@/hooks/useIncome'
 import { useProjects } from '@/hooks/useProjects'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
+import { SelectWithRefresh } from '@/components/SelectWithRefresh'
 import type { IncomeInput } from '@/lib/types'
 
 type FormData = {
@@ -28,10 +29,13 @@ export default function IncomeForm() {
   const isEditMode = !!id
 
   const { data: income, isLoading: isIncomeLoading } = useIncomeById(id)
-  const { data: projects, isLoading: isProjectsLoading } = useProjects()
-  const { data: bankAccounts, isLoading: isBanksLoading } = useBankAccounts()
+  const { data: projects, isLoading: isProjectsLoading, refetch: refetchProjects } = useProjects()
+  const { data: bankAccounts, isLoading: isBanksLoading, refetch: refetchBankAccounts } = useBankAccounts()
   const { data: categories, isLoading: isCategoriesLoading } = useMasterConfigsByType('INCOME_CATEGORY')
   const { data: paymentModes, isLoading: isModesLoading } = useMasterConfigsByType('PAYMENT_MODE')
+
+  const [isRefreshingProjects, setIsRefreshingProjects] = useState(false)
+  const [isRefreshingBanks, setIsRefreshingBanks] = useState(false)
   
   const createIncome = useCreateIncome()
   const updateIncome = useUpdateIncome()
@@ -39,6 +43,7 @@ export default function IncomeForm() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
     reset,
   } = useForm<FormData>({
@@ -53,11 +58,23 @@ export default function IncomeForm() {
     },
   })
 
+  const handleRefreshProjects = async () => {
+    setIsRefreshingProjects(true)
+    await refetchProjects()
+    setIsRefreshingProjects(false)
+  }
+
+  const handleRefreshBanks = async () => {
+    setIsRefreshingBanks(true)
+    await refetchBankAccounts()
+    setIsRefreshingBanks(false)
+  }
+
   // Populate form when editing
   useEffect(() => {
     if (income) {
       reset({
-        project_id: income.project_id || '',
+        project_id: income.project_id || '__none__',
         bank_account_id: income.bank_account_id || '',
         date: income.date,
         received_from: income.received_from || '',
@@ -70,7 +87,7 @@ export default function IncomeForm() {
 
   const onSubmit = async (data: FormData) => {
     const input: IncomeInput = {
-      project_id: data.project_id || null,
+      project_id: (data.project_id === '__none__' || !data.project_id) ? null : data.project_id,
       bank_account_id: data.bank_account_id || null,
       date: data.date,
       received_from: data.received_from || null,
@@ -127,18 +144,28 @@ export default function IncomeForm() {
             {/* Project Selection */}
             <div className="space-y-2">
               <Label htmlFor="project_id">Project (Optional)</Label>
-              <select
-                id="project_id"
-                {...register('project_id')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Common / No Project</option>
-                {projects?.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.project_id_code} - {project.customer?.name}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                name="project_id"
+                control={control}
+                render={({ field }) => (
+                  <SelectWithRefresh
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={[
+                      { value: '__none__', label: 'Common / No Project' },
+                      ...(projects?.map(p => ({ 
+                        value: p.id, 
+                        label: `${p.project_id_code} - ${p.customer?.name}` 
+                      })) || [])
+                    ]}
+                    placeholder="Select Project"
+                    disabled={isProjectsLoading}
+                    isRefreshing={isRefreshingProjects}
+                    onRefresh={handleRefreshProjects}
+                    quickAddType="project"
+                  />
+                )}
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -184,18 +211,28 @@ export default function IncomeForm() {
                 <Label htmlFor="bank_account_id">
                   Bank Account <span className="text-destructive">*</span>
                 </Label>
-                <select
-                  id="bank_account_id"
-                  {...register('bank_account_id', { required: 'Bank account is required' })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Select Bank Account</option>
-                  {bankAccounts?.map((bank) => (
-                    <option key={bank.id} value={bank.id}>
-                      {bank.account_name} ({bank.bank_name})
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name="bank_account_id"
+                  control={control}
+                  rules={{ required: 'Bank account is required' }}
+                  render={({ field }) => (
+                    <SelectWithRefresh
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={[
+                        ...(bankAccounts?.map(b => ({ 
+                          value: b.id, 
+                          label: `${b.account_name}${b.bank_name ? ` (${b.bank_name})` : ''}` 
+                        })) || [])
+                      ]}
+                      placeholder="Select Bank Account"
+                      disabled={isBanksLoading}
+                      isRefreshing={isRefreshingBanks}
+                      onRefresh={handleRefreshBanks}
+                      quickAddType="bank_account"
+                    />
+                  )}
+                />
                 {errors.bank_account_id && (
                   <p className="text-sm text-destructive">{errors.bank_account_id.message}</p>
                 )}

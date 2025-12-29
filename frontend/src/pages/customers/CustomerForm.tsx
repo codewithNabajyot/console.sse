@@ -16,10 +16,16 @@ type FormData = {
   gst_number: string
 }
 
-export default function CustomerForm() {
+interface CustomerFormProps {
+  isDialog?: boolean
+  onSuccess?: () => void
+  onCancel?: () => void
+}
+
+export default function CustomerForm({ isDialog, onSuccess, onCancel }: CustomerFormProps = {}) {
   const { orgSlug, id } = useParams()
   const navigate = useNavigate()
-  const isEditMode = !!id
+  const isEditMode = !!id && !isDialog // In dialog mode, we always assume "create" for now
 
   const { data: customer, isLoading } = useCustomer(id)
   const createCustomer = useCreateCustomer()
@@ -65,7 +71,12 @@ export default function CustomerForm() {
       } else {
         await createCustomer.mutateAsync(input)
       }
-      navigate(`/${orgSlug}/customers`)
+      
+      if (isDialog) {
+        onSuccess?.()
+      } else {
+        navigate(`/${orgSlug}/customers`)
+      }
     } catch (error) {
       // Error is handled by the mutation hooks with toast
       console.error('Form submission error:', error)
@@ -73,7 +84,11 @@ export default function CustomerForm() {
   }
 
   const handleCancel = () => {
-    navigate(`/${orgSlug}/customers`)
+    if (isDialog) {
+      onCancel?.()
+    } else {
+      navigate(`/${orgSlug}/customers`)
+    }
   }
 
   if (isLoading && isEditMode) {
@@ -82,6 +97,85 @@ export default function CustomerForm() {
         <div className="text-muted-foreground">Loading customer...</div>
       </div>
     )
+  }
+
+  const content = (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Name */}
+      <div className="space-y-2">
+        <Label htmlFor="name">
+          Name <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="name"
+          {...register('name', { required: 'Name is required' })}
+          placeholder="Enter customer name"
+        />
+        {errors.name && (
+          <p className="text-sm text-destructive">{errors.name.message}</p>
+        )}
+      </div>
+
+      {/* Email */}
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          {...register('email')}
+          placeholder="customer@example.com"
+        />
+      </div>
+
+      {/* Phone */}
+      <div className="space-y-2">
+        <Label htmlFor="phone">Phone</Label>
+        <Input
+          id="phone"
+          type="tel"
+          {...register('phone')}
+          placeholder="+91 98765 43210"
+        />
+      </div>
+
+      {/* GST Number */}
+      <div className="space-y-2">
+        <Label htmlFor="gst_number">GST Number</Label>
+        <Input
+          id="gst_number"
+          {...register('gst_number')}
+          placeholder="22AAAAA0000A1Z5"
+        />
+      </div>
+
+
+      {/* Actions */}
+      <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleCancel}
+          className="w-full sm:w-auto"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={createCustomer.isPending || updateCustomer.isPending}
+          className="w-full sm:w-auto"
+        >
+          {createCustomer.isPending || updateCustomer.isPending
+            ? 'Saving...'
+            : isEditMode
+            ? 'Update Customer'
+            : 'Create Customer'}
+        </Button>
+      </div>
+    </form>
+  )
+
+  if (isDialog) {
+    return content
   }
 
   return (
@@ -104,78 +198,7 @@ export default function CustomerForm() {
       {/* Form */}
       <Card>
         <CardContent className="pt-6">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Name */}
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                {...register('name', { required: 'Name is required' })}
-                placeholder="Enter customer name"
-              />
-              {errors.name && (
-                <p className="text-sm text-destructive">{errors.name.message}</p>
-              )}
-            </div>
-
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                {...register('email')}
-                placeholder="customer@example.com"
-              />
-            </div>
-
-            {/* Phone */}
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                type="tel"
-                {...register('phone')}
-                placeholder="+91 98765 43210"
-              />
-            </div>
-
-            {/* GST Number */}
-            <div className="space-y-2">
-              <Label htmlFor="gst_number">GST Number</Label>
-              <Input
-                id="gst_number"
-                {...register('gst_number')}
-                placeholder="22AAAAA0000A1Z5"
-              />
-            </div>
-
-
-            {/* Actions */}
-            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                className="w-full sm:w-auto"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createCustomer.isPending || updateCustomer.isPending}
-                className="w-full sm:w-auto"
-              >
-                {createCustomer.isPending || updateCustomer.isPending
-                  ? 'Saving...'
-                  : isEditMode
-                  ? 'Update Customer'
-                  : 'Create Customer'}
-              </Button>
-            </div>
-          </form>
+          {content}
         </CardContent>
       </Card>
     </div>

@@ -15,10 +15,16 @@ type FormData = {
   account_number: string
 }
 
-export default function BankAccountForm() {
+interface BankAccountFormProps {
+  isDialog?: boolean
+  onSuccess?: () => void
+  onCancel?: () => void
+}
+
+export default function BankAccountForm({ isDialog, onSuccess, onCancel }: BankAccountFormProps = {}) {
   const { orgSlug, id } = useParams()
   const navigate = useNavigate()
-  const isEditMode = !!id
+  const isEditMode = !!id && !isDialog // In dialog mode, we always assume "create" for now
 
   const { data: bankAccount, isLoading } = useBankAccount(id)
   const createBankAccount = useCreateBankAccount()
@@ -61,14 +67,23 @@ export default function BankAccountForm() {
       } else {
         await createBankAccount.mutateAsync(input)
       }
-      navigate(`/${orgSlug}/bank-accounts`)
+      
+      if (isDialog) {
+        onSuccess?.()
+      } else {
+        navigate(`/${orgSlug}/bank-accounts`)
+      }
     } catch (error) {
       console.error('Form submission error:', error)
     }
   }
 
   const handleCancel = () => {
-    navigate(`/${orgSlug}/bank-accounts`)
+    if (isDialog) {
+      onCancel?.()
+    } else {
+      navigate(`/${orgSlug}/bank-accounts`)
+    }
   }
 
   if (isLoading && isEditMode) {
@@ -85,6 +100,73 @@ export default function BankAccountForm() {
       currency: 'INR',
       minimumFractionDigits: 2,
     }).format(amount)
+  }
+
+  const content = (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Account Name */}
+      <div className="space-y-2">
+        <Label htmlFor="account_name">
+          Account Name <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="account_name"
+          {...register('account_name', { required: 'Account name is required' })}
+          placeholder="e.g., Main Business Account, Savings"
+        />
+        {errors.account_name && (
+          <p className="text-sm text-destructive">{errors.account_name.message}</p>
+        )}
+      </div>
+
+      {/* Bank Name */}
+      <div className="space-y-2">
+        <Label htmlFor="bank_name">Bank Name</Label>
+        <Input
+          id="bank_name"
+          {...register('bank_name')}
+          placeholder="e.g., HDFC Bank, State Bank of India"
+        />
+      </div>
+
+      {/* Account Number */}
+      <div className="space-y-2">
+        <Label htmlFor="account_number">Account Number</Label>
+        <Input
+          id="account_number"
+          {...register('account_number')}
+          placeholder="Enter account number"
+        />
+      </div>
+
+
+      {/* Actions */}
+      <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleCancel}
+          className="w-full sm:w-auto"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={createBankAccount.isPending || updateBankAccount.isPending}
+          className="w-full sm:w-auto"
+        >
+          {createBankAccount.isPending || updateBankAccount.isPending
+            ? 'Saving...'
+            : isEditMode
+            ? 'Update Bank Account'
+            : 'Create Bank Account'}
+        </Button>
+      </div>
+    </form>
+  )
+
+  if (isDialog) {
+    return content
   }
 
   return (
@@ -127,66 +209,7 @@ export default function BankAccountForm() {
       {/* Form */}
       <Card>
         <CardContent className="pt-6">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Account Name */}
-            <div className="space-y-2">
-              <Label htmlFor="account_name">
-                Account Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="account_name"
-                {...register('account_name', { required: 'Account name is required' })}
-                placeholder="e.g., Main Business Account, Savings"
-              />
-              {errors.account_name && (
-                <p className="text-sm text-destructive">{errors.account_name.message}</p>
-              )}
-            </div>
-
-            {/* Bank Name */}
-            <div className="space-y-2">
-              <Label htmlFor="bank_name">Bank Name</Label>
-              <Input
-                id="bank_name"
-                {...register('bank_name')}
-                placeholder="e.g., HDFC Bank, State Bank of India"
-              />
-            </div>
-
-            {/* Account Number */}
-            <div className="space-y-2">
-              <Label htmlFor="account_number">Account Number</Label>
-              <Input
-                id="account_number"
-                {...register('account_number')}
-                placeholder="Enter account number"
-              />
-            </div>
-
-
-            {/* Actions */}
-            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                className="w-full sm:w-auto"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createBankAccount.isPending || updateBankAccount.isPending}
-                className="w-full sm:w-auto"
-              >
-                {createBankAccount.isPending || updateBankAccount.isPending
-                  ? 'Saving...'
-                  : isEditMode
-                  ? 'Update Bank Account'
-                  : 'Create Bank Account'}
-              </Button>
-            </div>
-          </form>
+          {content}
         </CardContent>
       </Card>
     </div>

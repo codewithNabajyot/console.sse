@@ -35,6 +35,7 @@ import { ModeToggle } from '@/components/ModeToggle'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { useMasterConfigs } from '@/hooks/useMasterConfigs'
+import { QuickAdd } from '@/components/quick-add/QuickAdd'
 
 export const Layout: React.FC = () => {
   const { orgSlug } = useParams()
@@ -184,23 +185,57 @@ export const Layout: React.FC = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="end" className="w-56 mb-2">
-                <DropdownMenuItem asChild>
-                  <Link to={`/${orgSlug}/customers/new`} className="cursor-pointer w-full flex items-center">
-                    <Users className="mr-2 h-4 w-4" />
-                    <span>New Customer</span>
-                  </Link>
+                <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+                  <div className="w-full">
+                    <QuickAdd 
+                      type="project"
+                      trigger={
+                        <button className="w-full flex items-center cursor-pointer">
+                          <FolderKanban className="mr-2 h-4 w-4" />
+                          <span>New Project</span>
+                        </button>
+                      }
+                    />
+                  </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to={`/${orgSlug}/vendors/new`} className="cursor-pointer w-full flex items-center">
-                    <Building2 className="mr-2 h-4 w-4" />
-                    <span>New Vendor</span>
-                  </Link>
+                <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+                  <div className="w-full">
+                    <QuickAdd 
+                      type="customer"
+                      trigger={
+                        <button className="w-full flex items-center cursor-pointer">
+                          <Users className="mr-2 h-4 w-4" />
+                          <span>New Customer</span>
+                        </button>
+                      }
+                    />
+                  </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to={`/${orgSlug}/bank-accounts/new`} className="cursor-pointer w-full flex items-center">
-                    <Landmark className="mr-2 h-4 w-4" />
-                    <span>New Bank Account</span>
-                  </Link>
+                <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+                  <div className="w-full">
+                    <QuickAdd 
+                      type="vendor"
+                      trigger={
+                        <button className="w-full flex items-center cursor-pointer">
+                          <Building2 className="mr-2 h-4 w-4" />
+                          <span>New Vendor</span>
+                        </button>
+                      }
+                    />
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+                  <div className="w-full">
+                    <QuickAdd 
+                      type="bank_account"
+                      trigger={
+                        <button className="w-full flex items-center cursor-pointer">
+                          <Landmark className="mr-2 h-4 w-4" />
+                          <span>New Bank Account</span>
+                        </button>
+                      }
+                    />
+                  </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -225,23 +260,57 @@ export const Layout: React.FC = () => {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="center" className="w-56 mb-4">
-                  <DropdownMenuItem asChild>
-                    <Link to={`/${orgSlug}/customers/new`} className="cursor-pointer w-full flex items-center">
-                      <Users className="mr-2 h-4 w-4" />
-                      <span>New Customer</span>
-                    </Link>
+                  <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+                    <div className="w-full">
+                      <QuickAdd 
+                        type="project"
+                        trigger={
+                          <button className="w-full flex items-center cursor-pointer">
+                            <FolderKanban className="mr-2 h-4 w-4" />
+                            <span>New Project</span>
+                          </button>
+                        }
+                      />
+                    </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to={`/${orgSlug}/vendors/new`} className="cursor-pointer w-full flex items-center">
-                      <Building2 className="mr-2 h-4 w-4" />
-                      <span>New Vendor</span>
-                    </Link>
+                  <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+                    <div className="w-full">
+                      <QuickAdd 
+                        type="customer"
+                        trigger={
+                          <button className="w-full flex items-center cursor-pointer">
+                            <Users className="mr-2 h-4 w-4" />
+                            <span>New Customer</span>
+                          </button>
+                        }
+                      />
+                    </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to={`/${orgSlug}/bank-accounts/new`} className="cursor-pointer w-full flex items-center">
-                      <Landmark className="mr-2 h-4 w-4" />
-                      <span>New Bank Account</span>
-                    </Link>
+                  <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+                    <div className="w-full">
+                      <QuickAdd 
+                        type="vendor"
+                        trigger={
+                          <button className="w-full flex items-center cursor-pointer">
+                            <Building2 className="mr-2 h-4 w-4" />
+                            <span>New Vendor</span>
+                          </button>
+                        }
+                      />
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+                    <div className="w-full">
+                      <QuickAdd 
+                        type="bank_account"
+                        trigger={
+                          <button className="w-full flex items-center cursor-pointer">
+                            <Landmark className="mr-2 h-4 w-4" />
+                            <span>New Bank Account</span>
+                          </button>
+                        }
+                      />
+                    </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

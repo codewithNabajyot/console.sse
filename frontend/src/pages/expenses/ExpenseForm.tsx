@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { useExpenseById, useCreateExpense, useUpdateExpense } from '@/hooks/useExpenses'
 import { useProjects } from '@/hooks/useProjects'
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { SelectWithRefresh } from '@/components/SelectWithRefresh'
 import type { ExpenseInput } from '@/lib/types'
 
 type FormData = {
@@ -32,9 +33,13 @@ export default function ExpenseForm() {
   const isEditMode = !!id
 
   const { data: expense, isLoading: isExpenseLoading } = useExpenseById(id)
-  const { data: projects, isLoading: isProjectsLoading } = useProjects()
-  const { data: vendors, isLoading: isVendorsLoading } = useVendors()
-  const { data: bankAccounts, isLoading: isBanksLoading } = useBankAccounts()
+  const { data: projects, isLoading: isProjectsLoading, refetch: refetchProjects } = useProjects()
+  const { data: vendors, isLoading: isVendorsLoading, refetch: refetchVendors } = useVendors()
+  const { data: bankAccounts, isLoading: isBanksLoading, refetch: refetchBankAccounts } = useBankAccounts()
+
+  const [isRefreshingProjects, setIsRefreshingProjects] = useState(false)
+  const [isRefreshingVendors, setIsRefreshingVendors] = useState(false)
+  const [isRefreshingBanks, setIsRefreshingBanks] = useState(false)
   
   // Load both category types
   const { data: projectCategories } = useMasterConfigsByType('PROJECT_EXPENSE_CATEGORY')
@@ -46,6 +51,7 @@ export default function ExpenseForm() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
     reset,
     watch,
@@ -66,12 +72,30 @@ export default function ExpenseForm() {
   const selectedProjectId = watch('project_id')
   const categories = selectedProjectId ? projectCategories : commonCategories
 
+  const handleRefreshProjects = async () => {
+    setIsRefreshingProjects(true)
+    await refetchProjects()
+    setIsRefreshingProjects(false)
+  }
+
+  const handleRefreshVendors = async () => {
+    setIsRefreshingVendors(true)
+    await refetchVendors()
+    setIsRefreshingVendors(false)
+  }
+
+  const handleRefreshBanks = async () => {
+    setIsRefreshingBanks(true)
+    await refetchBankAccounts()
+    setIsRefreshingBanks(false)
+  }
+
   // Populate form when editing
   useEffect(() => {
     if (expense) {
       reset({
-        project_id: expense.project_id || '',
-        vendor_id: expense.vendor_id || '',
+        project_id: expense.project_id || '__none__',
+        vendor_id: expense.vendor_id || '__none__',
         bank_account_id: expense.bank_account_id || '',
         date: expense.date,
         description: expense.description || '',
@@ -93,8 +117,8 @@ export default function ExpenseForm() {
     const gstAmount = totalPaid - taxableValue
 
     const input: ExpenseInput = {
-      project_id: data.project_id || null,
-      vendor_id: data.vendor_id || null,
+      project_id: (data.project_id === '__none__' || !data.project_id) ? null : data.project_id,
+      vendor_id: (data.vendor_id === '__none__' || !data.vendor_id) ? null : data.vendor_id,
       bank_account_id: data.bank_account_id || null,
       date: data.date,
       description: data.description || null,
@@ -170,18 +194,28 @@ export default function ExpenseForm() {
             {/* Project Selection (Full Width) */}
             <div className="space-y-2">
               <Label htmlFor="project_id">Project (Optional)</Label>
-              <select
-                id="project_id"
-                {...register('project_id')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Common / Non-Project Expense</option>
-                {projects?.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.project_id_code} - {project.customer?.name}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                name="project_id"
+                control={control}
+                render={({ field }) => (
+                  <SelectWithRefresh
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={[
+                      { value: '__none__', label: 'Common / Non-Project Expense' },
+                      ...(projects?.map(p => ({ 
+                        value: p.id, 
+                        label: `${p.project_id_code} - ${p.customer?.name}` 
+                      })) || [])
+                    ]}
+                    placeholder="Select Project"
+                    disabled={isProjectsLoading}
+                    isRefreshing={isRefreshingProjects}
+                    onRefresh={handleRefreshProjects}
+                    quickAddType="project"
+                  />
+                )}
+              />
             </div>
 
             {/* Date and Category (2 Columns) */}
@@ -279,18 +313,25 @@ export default function ExpenseForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="vendor_id">Vendor</Label>
-                <select
-                  id="vendor_id"
-                  {...register('vendor_id')}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Select Vendor</option>
-                  {vendors?.map((vendor) => (
-                    <option key={vendor.id} value={vendor.id}>
-                      {vendor.name}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name="vendor_id"
+                  control={control}
+                  render={({ field }) => (
+                    <SelectWithRefresh
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={[
+                        { value: '__none__', label: 'No Vendor' },
+                        ...(vendors?.map(v => ({ value: v.id, label: v.name })) || [])
+                      ]}
+                      placeholder="Select Vendor"
+                      disabled={isVendorsLoading}
+                      isRefreshing={isRefreshingVendors}
+                      onRefresh={handleRefreshVendors}
+                      quickAddType="vendor"
+                    />
+                  )}
+                />
               </div>
 
               <div className="space-y-2">
@@ -309,18 +350,31 @@ export default function ExpenseForm() {
                 <Label htmlFor="bank_account_id">
                   Paid From <span className="text-destructive">*</span>
                 </Label>
-                <select
-                  id="bank_account_id"
-                  {...register('bank_account_id', { required: 'Bank account is required' })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">Select Bank Account</option>
-                  {bankAccounts?.map((bank) => (
-                    <option key={bank.id} value={bank.id}>
-                      {bank.account_name} ({bank.bank_name})
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name="bank_account_id"
+                  control={control}
+                  rules={{ required: 'Bank account is required' }}
+                  render={({ field }) => (
+                    <SelectWithRefresh
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={[
+                        ...(bankAccounts?.map(b => ({ 
+                          value: b.id, 
+                          label: `${b.account_name}${b.bank_name ? ` (${b.bank_name})` : ''}` 
+                        })) || [])
+                      ]}
+                      placeholder="Select Bank Account"
+                      disabled={isBanksLoading}
+                      isRefreshing={isRefreshingBanks}
+                      onRefresh={handleRefreshBanks}
+                      quickAddType="bank_account"
+                    />
+                  )}
+                />
+                {errors.bank_account_id && (
+                  <p className="text-sm text-destructive">{errors.bank_account_id.message}</p>
+                )}
               </div>
               {/* Spacer/Placeholder for potential Payment Mode */}
               <div className="hidden sm:block"></div>

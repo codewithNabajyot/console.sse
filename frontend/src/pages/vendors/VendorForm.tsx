@@ -15,10 +15,16 @@ type FormData = {
   gst_number: string
 }
 
-export default function VendorForm() {
+interface VendorFormProps {
+  isDialog?: boolean
+  onSuccess?: () => void
+  onCancel?: () => void
+}
+
+export default function VendorForm({ isDialog, onSuccess, onCancel }: VendorFormProps = {}) {
   const { orgSlug, id } = useParams()
   const navigate = useNavigate()
-  const isEditMode = !!id
+  const isEditMode = !!id && !isDialog // In dialog mode, we always assume "create" for now
 
   const { data: vendor, isLoading } = useVendor(id)
   const createVendor = useCreateVendor()
@@ -61,14 +67,23 @@ export default function VendorForm() {
       } else {
         await createVendor.mutateAsync(input)
       }
-      navigate(`/${orgSlug}/vendors`)
+      
+      if (isDialog) {
+        onSuccess?.()
+      } else {
+        navigate(`/${orgSlug}/vendors`)
+      }
     } catch (error) {
       console.error('Form submission error:', error)
     }
   }
 
   const handleCancel = () => {
-    navigate(`/${orgSlug}/vendors`)
+    if (isDialog) {
+      onCancel?.()
+    } else {
+      navigate(`/${orgSlug}/vendors`)
+    }
   }
 
   if (isLoading && isEditMode) {
@@ -77,6 +92,73 @@ export default function VendorForm() {
         <div className="text-muted-foreground">Loading vendor...</div>
       </div>
     )
+  }
+
+  const content = (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Name */}
+      <div className="space-y-2">
+        <Label htmlFor="name">
+          Name <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="name"
+          {...register('name', { required: 'Name is required' })}
+          placeholder="Enter vendor name"
+        />
+        {errors.name && (
+          <p className="text-sm text-destructive">{errors.name.message}</p>
+        )}
+      </div>
+
+      {/* Category */}
+      <div className="space-y-2">
+        <Label htmlFor="category">Category</Label>
+        <Input
+          id="category"
+          {...register('category')}
+          placeholder="e.g., Solar Panels, Inverters, Installation"
+        />
+      </div>
+
+      {/* GST Number */}
+      <div className="space-y-2">
+        <Label htmlFor="gst_number">GST Number</Label>
+        <Input
+          id="gst_number"
+          {...register('gst_number')}
+          placeholder="22AAAAA0000A1Z5"
+        />
+      </div>
+
+
+      {/* Actions */}
+      <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleCancel}
+          className="w-full sm:w-auto"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={createVendor.isPending || updateVendor.isPending}
+          className="w-full sm:w-auto"
+        >
+          {createVendor.isPending || updateVendor.isPending
+            ? 'Saving...'
+            : isEditMode
+            ? 'Update Vendor'
+            : 'Create Vendor'}
+        </Button>
+      </div>
+    </form>
+  )
+
+  if (isDialog) {
+    return content
   }
 
   return (
@@ -99,66 +181,7 @@ export default function VendorForm() {
       {/* Form */}
       <Card>
         <CardContent className="pt-6">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Name */}
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                {...register('name', { required: 'Name is required' })}
-                placeholder="Enter vendor name"
-              />
-              {errors.name && (
-                <p className="text-sm text-destructive">{errors.name.message}</p>
-              )}
-            </div>
-
-            {/* Category */}
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                {...register('category')}
-                placeholder="e.g., Solar Panels, Inverters, Installation"
-              />
-            </div>
-
-            {/* GST Number */}
-            <div className="space-y-2">
-              <Label htmlFor="gst_number">GST Number</Label>
-              <Input
-                id="gst_number"
-                {...register('gst_number')}
-                placeholder="22AAAAA0000A1Z5"
-              />
-            </div>
-
-
-            {/* Actions */}
-            <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                className="w-full sm:w-auto"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createVendor.isPending || updateVendor.isPending}
-                className="w-full sm:w-auto"
-              >
-                {createVendor.isPending || updateVendor.isPending
-                  ? 'Saving...'
-                  : isEditMode
-                  ? 'Update Vendor'
-                  : 'Create Vendor'}
-              </Button>
-            </div>
-          </form>
+          {content}
         </CardContent>
       </Card>
     </div>

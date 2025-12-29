@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { useInvoiceById, useCreateInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
 import { useProjects } from '@/hooks/useProjects'
+import { SelectWithRefresh } from '@/components/SelectWithRefresh'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,7 +26,8 @@ export default function InvoiceForm() {
   const isEditMode = !!id
 
   const { data: invoice, isLoading: isInvoiceLoading } = useInvoiceById(id)
-  const { data: projects, isLoading: isProjectsLoading } = useProjects()
+  const { data: projects, isLoading: isProjectsLoading, refetch: refetchProjects } = useProjects()
+  const [isRefreshingProjects, setIsRefreshingProjects] = useState(false)
   
   const createInvoice = useCreateInvoice()
   const updateInvoice = useUpdateInvoice()
@@ -36,6 +38,7 @@ export default function InvoiceForm() {
     formState: { errors },
     reset,
     watch,
+    control,
   } = useForm<FormData>({
     defaultValues: {
       project_id: '',
@@ -51,7 +54,7 @@ export default function InvoiceForm() {
   useEffect(() => {
     if (invoice) {
       reset({
-        project_id: invoice.project_id || '',
+        project_id: invoice.project_id || '__none__',
         date: invoice.date,
         invoice_number: invoice.invoice_number,
         total_amount: invoice.total_amount,
@@ -72,7 +75,7 @@ export default function InvoiceForm() {
     const taxableValue = totalAmount - gstAmount
 
     const input: InvoiceInput = {
-      project_id: data.project_id || null,
+      project_id: (data.project_id === '__none__' || !data.project_id) ? null : data.project_id,
       date: data.date,
       invoice_number: data.invoice_number,
       total_amount: totalAmount,
@@ -92,6 +95,12 @@ export default function InvoiceForm() {
     } catch (error) {
       console.error('Form submission error:', error)
     }
+  }
+
+  const handleRefreshProjects = async () => {
+    setIsRefreshingProjects(true)
+    await refetchProjects()
+    setIsRefreshingProjects(false)
   }
 
   const handleCancel = () => {
@@ -146,18 +155,28 @@ export default function InvoiceForm() {
             {/* Project Selection (Full Width) */}
             <div className="space-y-2">
               <Label htmlFor="project_id">Project (Optional)</Label>
-              <select
-                id="project_id"
-                {...register('project_id')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">No Project</option>
-                {projects?.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.project_id_code} - {project.customer?.name}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                name="project_id"
+                control={control}
+                render={({ field }) => (
+                  <SelectWithRefresh
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={[
+                      { value: '__none__', label: 'No Project' },
+                      ...(projects?.map((project) => ({
+                        value: project.id,
+                        label: `${project.project_id_code} - ${project.customer?.name}`,
+                      })) || []),
+                    ]}
+                    placeholder="Select Project"
+                    disabled={isProjectsLoading}
+                    isRefreshing={isRefreshingProjects}
+                    onRefresh={handleRefreshProjects}
+                    quickAddType="project"
+                  />
+                )}
+              />
             </div>
 
             {/* Date and Invoice Number (2 Columns) */}
