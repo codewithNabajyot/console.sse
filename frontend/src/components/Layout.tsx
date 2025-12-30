@@ -13,7 +13,9 @@ import {
   Users,
   Building2,
   Landmark,
-  LogOut
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -40,6 +42,18 @@ export const Layout: React.FC = () => {
   const { orgSlug } = useParams()
   const location = useLocation()
   const [isMoreOpen, setIsMoreOpen] = React.useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar-collapsed') === 'true'
+    }
+    return false
+  })
+
+  // Update localStorage when state changes
+  React.useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(isSidebarCollapsed))
+  }, [isSidebarCollapsed])
+
   const { user, profile, signOut } = useAuth()
   
   // Pre-fetch and cache master configs
@@ -94,10 +108,13 @@ export const Layout: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground transition-colors duration-300">
       {/* Header */}
-      <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-sm">
-        <div className="container flex h-16 items-center justify-between px-4 mx-auto max-w-6xl">
+      <header className={cn(
+        "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-sm transition-all duration-300",
+        isSidebarCollapsed ? "md:pl-20" : "md:pl-64"
+      )}>
+        <div className="container flex h-16 items-center justify-between px-4 mx-auto max-w-md md:max-w-6xl">
           <div className="flex items-center gap-2">
-            <Link to={`/${orgSlug}/dashboard`} className="flex items-center gap-2">
+            <Link to={`/${orgSlug}/dashboard`} className={cn("flex items-center gap-2", !isSidebarCollapsed && "md:ml-4")}>
               <img 
                 src="/Suryasathi_logo_hz.svg" 
                 alt={`${profile?.organization?.name || 'Company'} Logo`} 
@@ -148,15 +165,34 @@ export const Layout: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 pb-24 md:pb-8 pt-4 md:pl-64">
+      <main className={cn(
+        "flex-1 pb-24 md:pb-8 pt-4 transition-all duration-300",
+        isSidebarCollapsed ? "md:pl-20" : "md:pl-64"
+      )}>
         <div className="container px-4 mx-auto max-w-md md:max-w-6xl">
           <Outlet />
         </div>
       </main>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-16 bottom-0 w-64 border-r bg-white dark:bg-slate-900 overflow-y-auto">
-        <nav className="flex flex-col w-full p-4 gap-2">
+      <aside className={cn(
+        "hidden md:flex flex-col fixed left-0 top-0 bottom-0 border-r bg-white dark:bg-slate-900 overflow-y-auto transition-all duration-300 z-50",
+        isSidebarCollapsed ? "w-20" : "w-64"
+      )}>
+        <div className="h-16 flex items-center px-4 border-b">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn(
+              "h-9 w-9 text-muted-foreground hover:text-primary transition-all",
+              isSidebarCollapsed ? "mx-auto" : "ml-auto"
+            )}
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </Button>
+        </div>
+        <nav className="flex flex-col flex-1 w-full p-4 gap-2">
           {navItems.map((item) => {
             if (item.primary) return null;
             
@@ -169,36 +205,39 @@ export const Layout: React.FC = () => {
                 <div key={item.label} className="flex flex-col gap-1">
                   <div
                     className={cn(
-                      "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all cursor-default",
+                      "flex items-center rounded-xl text-sm font-medium transition-all cursor-default",
                       isActive 
                         ? "text-primary bg-primary/5" 
-                        : "text-muted-foreground"
+                        : "text-muted-foreground",
+                      isSidebarCollapsed ? "justify-center px-0 h-11 w-11 mx-auto" : "justify-between px-4 py-3"
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                      {item.label}
+                      <Icon className={cn("h-5 w-5 shrink-0", isActive && "text-primary")} />
+                      {!isSidebarCollapsed && item.label}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1 ml-9 border-l border-border pl-2">
-                    {item.children?.map((child) => {
-                      const isChildActive = location.pathname === child.href
-                      return (
-                        <Link
-                          key={child.href}
-                          to={child.href}
-                          className={cn(
-                            "px-3 py-2 rounded-lg text-xs font-medium transition-all",
-                            isChildActive
-                              ? "bg-primary/10 text-primary dark:bg-primary/20"
-                              : "text-muted-foreground hover:bg-muted dark:hover:bg-muted/50"
-                          )}
-                        >
-                          {child.label}
-                        </Link>
-                      )
-                    })}
-                  </div>
+                  {!isSidebarCollapsed && (
+                    <div className="flex flex-col gap-1 ml-9 border-l border-border pl-2">
+                      {item.children?.map((child) => {
+                        const isChildActive = location.pathname === child.href
+                        return (
+                          <Link
+                            key={child.href}
+                            to={child.href}
+                            className={cn(
+                              "px-3 py-2 rounded-lg text-xs font-medium transition-all",
+                              isChildActive
+                                ? "bg-primary/10 text-primary dark:bg-primary/20"
+                                : "text-muted-foreground hover:bg-muted dark:hover:bg-muted/50"
+                            )}
+                          >
+                            {child.label}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             }
@@ -208,14 +247,15 @@ export const Layout: React.FC = () => {
                 key={item.href || item.label}
                 to={item.href || `/${orgSlug}`}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                  "flex items-center rounded-xl text-sm font-medium transition-all",
                   isActive 
                     ? "bg-primary/10 text-primary dark:bg-primary/20" 
-                    : "text-muted-foreground hover:bg-muted dark:hover:bg-muted/50"
+                    : "text-muted-foreground hover:bg-muted dark:hover:bg-muted/50",
+                  isSidebarCollapsed ? "justify-center px-0 h-11 w-11 mx-auto" : "gap-3 px-4 py-3"
                 )}
               >
-                <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                {item.label}
+                <Icon className={cn("h-5 w-5 shrink-0", isActive && "text-primary")} />
+                {!isSidebarCollapsed && item.label}
               </Link>
             )
           })}
@@ -224,10 +264,13 @@ export const Layout: React.FC = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  className="w-full flex items-center justify-start gap-3 px-4 py-6 rounded-2xl text-sm font-medium bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all border-none"
+                  className={cn(
+                    "w-full flex items-center gap-3 rounded-2xl text-sm font-medium bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all border-none",
+                    isSidebarCollapsed ? "px-0 justify-center h-12 w-12 mx-auto" : "px-4 py-6 justify-start"
+                  )}
                 >
-                  <PlusCircle className="h-5 w-5" />
-                  Quick Add
+                  <PlusCircle className="h-5 w-5 shrink-0" />
+                  {!isSidebarCollapsed && "Quick Add"}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="end" className="w-56 mb-2">
