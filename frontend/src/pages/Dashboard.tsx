@@ -10,7 +10,6 @@ import {
   Users,
   Briefcase,
   Calendar,
-  Check,
   ChevronDown
 } from 'lucide-react'
 import { 
@@ -345,7 +344,7 @@ export default function Dashboard() {
                       cy="50%"
                       outerRadius={80}
                       dataKey="value"
-                      label={({ percent }: { percent: number }) => `${((percent || 0) * 100).toFixed(0)}%`}
+                      label={({ percent }: { percent?: number }) => `${((percent || 0) * 100).toFixed(0)}%`}
                     >
                       {stats.projectPipeline.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
