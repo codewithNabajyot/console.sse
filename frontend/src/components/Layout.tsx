@@ -95,7 +95,7 @@ export const Layout: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-background text-foreground transition-colors duration-300">
       {/* Header */}
       <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-sm">
-        <div className="container flex h-16 items-center justify-between px-4 mx-auto max-w-4xl">
+        <div className="container flex h-16 items-center justify-between px-4 mx-auto max-w-6xl">
           <div className="flex items-center gap-2">
             <Link to={`/${orgSlug}/dashboard`} className="flex items-center gap-2">
               <img 
@@ -149,7 +149,7 @@ export const Layout: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 pb-24 md:pb-8 pt-4 md:pl-64">
-        <div className="container px-4 mx-auto max-w-md md:max-w-4xl">
+        <div className="container px-4 mx-auto max-w-md md:max-w-6xl">
           <Outlet />
         </div>
       </main>
