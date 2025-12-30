@@ -8,8 +8,12 @@ interface Profile {
   role_id: string
   full_name: string
   organization: {
+    id: string
     name: string
     slug: string
+    gst_number: string | null
+    address: string | null
+    phone: string | null
   }
   role: {
     name: string
@@ -78,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Step 2 & 3: Fetch Organization and Role in parallel
       console.log('Fetching organization and role via direct API...')
       const [orgRes, roleRes] = await Promise.all([
-        fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${profileData.org_id}&select=id,name,slug`, { 
+        fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${profileData.org_id}&select=id,name,slug,gst_number,address,phone`, { 
           headers,
           signal: AbortSignal.timeout(8000)
         }),

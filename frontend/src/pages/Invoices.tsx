@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Eye, ChevronRight } from 'lucide-react'
 import { useInvoices, useDeleteInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
+import { InvoiceViewModal } from '@/components/InvoiceViewModal'
+import { PaymentHistoryModal } from '@/components/PaymentHistoryModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { NotesManager } from '@/components/NotesManager'
-import type { Note } from '@/lib/types'
+import type { Note, Invoice } from '@/lib/types'
 import {
   Table,
   TableBody,
@@ -36,12 +38,26 @@ export default function Invoices() {
   const { data: invoices, isLoading } = useInvoices()
   const deleteInvoice = useDeleteInvoice()
   const updateInvoice = useUpdateInvoice()
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+
+  const handleView = (invoice: Invoice) => {
+    setSelectedInvoice(invoice)
+    setIsViewModalOpen(true)
+  }
+
+  const handleHistory = (invoice: Invoice) => {
+    setSelectedInvoice(invoice)
+    setIsHistoryModalOpen(true)
+  }
 
   const filteredInvoices = invoices?.filter((invoice) => {
     const searchMatch = 
       invoice.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.project?.project_id_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.project?.customer?.name.toLowerCase().includes(searchQuery.toLowerCase())
+      invoice.project?.customer?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      invoice.customer?.name.toLowerCase().includes(searchQuery.toLowerCase())
     
     return searchMatch
   })
@@ -99,13 +115,14 @@ export default function Invoices() {
                   <TableHead>Taxable Value</TableHead>
                   <TableHead>GST</TableHead>
                   <TableHead>Total Amount</TableHead>
+                  <TableHead>Pending</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInvoices?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No invoices found.
                     </TableCell>
                   </TableRow>
@@ -124,8 +141,10 @@ export default function Invoices() {
                             <span className="font-mono text-xs font-semibold">{invoice.project.project_id_code}</span>
                             <span className="text-sm">{invoice.project.customer?.name}</span>
                           </div>
+                        ) : invoice.customer ? (
+                          <span className="text-sm font-medium">{invoice.customer.name}</span>
                         ) : (
-                          <span className="text-muted-foreground italic">No Project</span>
+                          <span className="text-muted-foreground italic">No Project / Customer</span>
                         )}
                       </TableCell>
                       <TableCell className="font-medium">
@@ -140,6 +159,26 @@ export default function Invoices() {
                       <TableCell className="font-semibold text-green-600">
                         ₹{invoice.total_amount.toLocaleString('en-IN')}
                       </TableCell>
+                      <TableCell className="font-semibold">
+                        <div className="flex items-center gap-2">
+                          {(invoice.total_amount - (invoice.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)) <= 0 ? (
+                            <Badge variant="success">Paid</Badge>
+                          ) : (
+                            <span className="text-orange-600">
+                              ₹{(invoice.total_amount - (invoice.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)).toLocaleString('en-IN')}
+                            </span>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleHistory(invoice)}
+                            title="View Payment History"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 text-primary">
                           <NotesManager
@@ -153,6 +192,13 @@ export default function Invoices() {
                             title={`Notes for Invoice ${invoice.invoice_number}`}
                             entityName={`Invoice ${invoice.invoice_number}`}
                           />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleView(invoice)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -211,6 +257,8 @@ export default function Invoices() {
                     <span className="font-mono text-xs">{invoice.project.project_id_code}</span>
                     <span className="text-xs text-muted-foreground">{invoice.project.customer?.name}</span>
                   </div>
+                ) : invoice.customer ? (
+                  <span className="text-xs font-medium">{invoice.customer.name}</span>
                 ) : 'No Project'
               },
               {
@@ -225,6 +273,28 @@ export default function Invoices() {
                 label: 'Total', 
                 value: `₹${invoice.total_amount.toLocaleString('en-IN')}`, 
                 className: 'text-green-600 font-bold' 
+              },
+              {
+                label: 'Pending',
+                value: (
+                  <div className="flex items-center gap-2">
+                    {(invoice.total_amount - (invoice.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)) <= 0 ? (
+                      <Badge variant="success">Paid</Badge>
+                    ) : (
+                      <span className="text-orange-600 font-bold">
+                        ₹{(invoice.total_amount - (invoice.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)).toLocaleString('en-IN')}
+                      </span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => handleHistory(invoice)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ),
               }
             ]}
             notesProps={{
@@ -245,6 +315,21 @@ export default function Invoices() {
           />
         ))}
       </div>
+
+      <InvoiceViewModal
+        invoice={selectedInvoice}
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+      />
+
+      <PaymentHistoryModal
+        title={selectedInvoice?.invoice_number || ''}
+        totalLabel="Total Amount"
+        totalAmount={selectedInvoice?.total_amount || 0}
+        income={selectedInvoice?.income}
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+      />
     </div>
   )
 }

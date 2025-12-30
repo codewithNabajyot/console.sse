@@ -16,7 +16,7 @@ export function useIncome(includeDeleted = false) {
       
       let query = supabase
         .from('income')
-        .select('*, project:projects(*, customer:customers(*)), bank_account:bank_accounts(*)')
+        .select('*, project:projects(*, customer:customers(*), income(amount)), bank_account:bank_accounts(*), invoice:invoices(*, income(amount)), customer:customers(*)')
         .eq('org_id', orgId)
       
       if (!includeDeleted) {
@@ -45,7 +45,7 @@ export function useIncomeById(id: string | undefined) {
       
       const { data, error } = await supabase
         .from('income')
-        .select('*, project:projects(*, customer:customers(*)), bank_account:bank_accounts(*)')
+        .select('*, project:projects(*, customer:customers(*)), bank_account:bank_accounts(*), invoice:invoices(*), customer:customers(*)')
         .eq('id', id)
         .eq('org_id', orgId)
         .is('deleted_at', null)

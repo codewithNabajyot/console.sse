@@ -42,6 +42,8 @@ export default function IncomeList() {
       record.received_from?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.project?.project_id_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.project?.customer?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.customer?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.invoice?.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.category?.toLowerCase().includes(searchQuery.toLowerCase())
     
     return searchMatch
@@ -116,14 +118,21 @@ export default function IncomeList() {
                         {format(new Date(record.date), 'dd MMM yyyy')}
                       </TableCell>
                       <TableCell>
-                        {record.project ? (
-                          <div className="flex flex-col">
-                            <span className="font-mono text-xs font-semibold">{record.project.project_id_code}</span>
-                            <span className="text-sm">{record.project.customer?.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground italic">Common</span>
-                        )}
+                        <div className="flex flex-col">
+                          {record.invoice && (
+                            <span className="font-mono text-[10px] font-bold text-blue-600">INV: {record.invoice.invoice_number}</span>
+                          )}
+                          {record.project ? (
+                            <>
+                              <span className="font-mono text-xs font-semibold">{record.project.project_id_code}</span>
+                              <span className="text-sm">{record.project.customer?.name}</span>
+                            </>
+                          ) : record.customer ? (
+                            <span className="text-sm font-medium">{record.customer.name}</span>
+                          ) : (
+                            <span className="text-muted-foreground italic">Common</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{record.category || 'N/A'}</Badge>
@@ -202,13 +211,22 @@ export default function IncomeList() {
             badge={<Badge variant="outline">{record.category || 'N/A'}</Badge>}
             fields={[
               { 
-                label: 'Project', 
-                value: record.project ? (
+                label: 'Source', 
+                value: (
                   <div className="flex flex-col items-end">
-                    <span className="font-mono text-xs">{record.project.project_id_code}</span>
-                    <span className="text-xs text-muted-foreground">{record.project.customer?.name}</span>
+                    {record.invoice && (
+                      <span className="font-mono text-[10px] font-bold text-blue-600">INV: {record.invoice.invoice_number}</span>
+                    )}
+                    {record.project ? (
+                      <>
+                        <span className="font-mono text-xs">{record.project.project_id_code}</span>
+                        <span className="text-xs text-muted-foreground">{record.project.customer?.name}</span>
+                      </>
+                    ) : record.customer ? (
+                      <span className="text-xs font-medium">{record.customer.name}</span>
+                    ) : 'Common'}
                   </div>
-                ) : 'Common'
+                )
               },
               { 
                 label: 'Amount', 

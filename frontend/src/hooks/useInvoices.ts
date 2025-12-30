@@ -16,7 +16,7 @@ export function useInvoices(includeDeleted = false) {
       
       let query = supabase
         .from('invoices')
-        .select('*, project:projects(*, customer:customers(*))')
+        .select('*, project:projects(*, customer:customers(*)), customer:customers(*), income(*, bank_account:bank_accounts(*))')
         .eq('org_id', orgId)
       
       if (!includeDeleted) {
@@ -45,7 +45,7 @@ export function useInvoiceById(id: string | undefined) {
       
       const { data, error } = await supabase
         .from('invoices')
-        .select('*, project:projects(*, customer:customers(*))')
+        .select('*, project:projects(*, customer:customers(*)), customer:customers(*)')
         .eq('id', id)
         .eq('org_id', orgId)
         .is('deleted_at', null)

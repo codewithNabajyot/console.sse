@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { useInvoiceById, useCreateInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
 import { useProjects } from '@/hooks/useProjects'
+import { useCustomers } from '@/hooks/useCustomers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +13,7 @@ import type { InvoiceInput } from '@/lib/types'
 
 type FormData = {
   project_id: string
+  customer_id: string
   date: string
   invoice_number: string
   total_amount: number
@@ -26,6 +28,7 @@ export default function InvoiceForm() {
 
   const { data: invoice, isLoading: isInvoiceLoading } = useInvoiceById(id)
   const { data: projects, isLoading: isProjectsLoading } = useProjects()
+  const { data: customers, isLoading: isCustomersLoading } = useCustomers()
   
   const createInvoice = useCreateInvoice()
   const updateInvoice = useUpdateInvoice()
@@ -36,9 +39,11 @@ export default function InvoiceForm() {
     formState: { errors },
     reset,
     watch,
+    setValue,
   } = useForm<FormData>({
     defaultValues: {
       project_id: '',
+      customer_id: '',
       date: new Date().toISOString().split('T')[0],
       invoice_number: '',
       total_amount: 0,
@@ -52,6 +57,7 @@ export default function InvoiceForm() {
     if (invoice) {
       reset({
         project_id: invoice.project_id || '',
+        customer_id: invoice.customer_id || '',
         date: invoice.date,
         invoice_number: invoice.invoice_number,
         total_amount: invoice.total_amount,
@@ -60,6 +66,18 @@ export default function InvoiceForm() {
       })
     }
   }, [invoice, reset])
+
+  const selectedProjectId = watch('project_id')
+
+  // Auto-fill customer if project is selected
+  useEffect(() => {
+    if (selectedProjectId) {
+      const project = projects?.find(p => p.id === selectedProjectId)
+      if (project?.customer_id) {
+        setValue('customer_id', project.customer_id)
+      }
+    }
+  }, [selectedProjectId, projects, setValue])
 
   const onSubmit = async (data: FormData) => {
     const totalAmount = Number(data.total_amount)
@@ -73,6 +91,7 @@ export default function InvoiceForm() {
 
     const input: InvoiceInput = {
       project_id: data.project_id || null,
+      customer_id: data.customer_id || null,
       date: data.date,
       invoice_number: data.invoice_number,
       total_amount: totalAmount,
@@ -98,7 +117,7 @@ export default function InvoiceForm() {
     navigate(`/${orgSlug}/invoices`)
   }
 
-  const isLoading = isInvoiceLoading || isProjectsLoading
+  const isLoading = isInvoiceLoading || isProjectsLoading || isCustomersLoading
 
   if (isLoading && isEditMode) {
     return (
@@ -144,20 +163,44 @@ export default function InvoiceForm() {
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             {/* Project Selection (Full Width) */}
-            <div className="space-y-2">
-              <Label htmlFor="project_id">Project (Optional)</Label>
-              <select
-                id="project_id"
-                {...register('project_id')}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">No Project</option>
-                {projects?.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.project_id_code} - {project.customer?.name}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="project_id">Project (Optional)</Label>
+                <select
+                  id="project_id"
+                  {...register('project_id')}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">No Project</option>
+                  {projects?.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.project_id_code} - {project.customer?.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="customer_id">
+                  Customer <span className="text-destructive">*</span>
+                </Label>
+                <select
+                  id="customer_id"
+                  {...register('customer_id', { required: 'Customer is required' })}
+                  disabled={!!selectedProjectId}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Select Customer</option>
+                  {customers?.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.customer_id && (
+                  <p className="text-sm text-destructive">{errors.customer_id.message}</p>
+                )}
+              </div>
             </div>
 
             {/* Date and Invoice Number (2 Columns) */}
