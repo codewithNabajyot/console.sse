@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search, CheckCircle2, Clock, Briefcase } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, CheckCircle2, Clock, Briefcase, ChevronRight } from 'lucide-react'
 import { useProjects, useDeleteProject, useUpdateProject } from '@/hooks/useProjects'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Note } from '@/lib/types'
+import type { Note, Project } from '@/lib/types'
 import { NotesManager } from '@/components/NotesManager'
 import { Badge } from '@/components/ui/badge'
+import { PaymentHistoryModal } from '@/components/PaymentHistoryModal'
+import { ProjectFinancialsModal } from '@/components/ProjectFinancialsModal'
 import {
   Table,
   TableBody,
@@ -38,6 +40,19 @@ export default function Projects() {
   const { data: projects, isLoading } = useProjects(true) // Fetch all including completed
   const deleteProject = useDeleteProject()
   const updateProject = useUpdateProject()
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
+  const [isFinancialsModalOpen, setIsFinancialsModalOpen] = useState(false)
+
+  const handleView = (project: Project) => {
+    setSelectedProject(project)
+    setIsViewModalOpen(true)
+  }
+
+  const handleFinancials = (project: Project) => {
+    setSelectedProject(project)
+    setIsFinancialsModalOpen(true)
+  }
 
   const stats = {
     booked: projects?.filter(p => !p.deleted_at && p.status === 'Booked').length || 0,
@@ -179,33 +194,81 @@ export default function Projects() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Project ID</TableHead>
+                  <TableHead>Project ID / Funding</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Deal Value</TableHead>
+                  <TableHead>Pending</TableHead>
+                  <TableHead>Profit Margin</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Funding</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProjects?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No projects found.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredProjects?.map((project) => (
                     <TableRow key={project.id}>
-                      <TableCell className="font-mono font-medium">{project.project_id_code}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-mono font-medium">{project.project_id_code}</span>
+                          <span className="text-[10px] text-muted-foreground">{project.funding_type || 'No Funding'}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>{project.customer?.name || '—'}</TableCell>
                       <TableCell>₹{project.deal_value.toLocaleString('en-IN')}</TableCell>
+                      <TableCell className="font-semibold">
+                        <div className="flex items-center gap-2">
+                          {(project.deal_value - (project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)) <= 0 ? (
+                            <Badge variant="success">Paid</Badge>
+                          ) : (
+                            <span className="text-orange-600">
+                              ₹{(project.deal_value - (project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)).toLocaleString('en-IN')}
+                            </span>
+                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => handleView(project)}
+                            title="View Payment History"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const income = project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0;
+                            const expenses = project.expenses?.reduce((sum, exp) => sum + exp.total_paid, 0) || 0;
+                            const profit = income - expenses;
+                            return (
+                              <span className={profit >= 0 ? 'text-blue-600' : 'text-red-600'}>
+                                ₹{profit.toLocaleString('en-IN')}
+                              </span>
+                            );
+                          })()}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => handleFinancials(project)}
+                            title="View Detailed Financials"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={getStatusBadgeVariant(project.status)}>
                           {project.status || 'Draft'}
                         </Badge>
                       </TableCell>
-                      <TableCell>{project.funding_type || '—'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 text-primary">
                           <NotesManager
@@ -270,7 +333,10 @@ export default function Projects() {
           <Card key={project.id}>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center justify-between">
-                <span className="font-mono">{project.project_id_code}</span>
+                <div className="flex flex-col">
+                  <span className="font-mono">{project.project_id_code}</span>
+                  <span className="text-[10px] text-muted-foreground font-normal">{project.funding_type || 'No Funding'}</span>
+                </div>
                 <Badge variant={getStatusBadgeVariant(project.status)}>
                   {project.status || 'Draft'}
                 </Badge>
@@ -285,9 +351,48 @@ export default function Projects() {
                 <span className="text-muted-foreground">Deal Value:</span>
                 <span className="font-medium">₹{project.deal_value.toLocaleString('en-IN')}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Funding:</span>
-                <span>{project.funding_type || '—'}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground font-semibold">Pending Amount:</span>
+                <div className="flex items-center gap-2">
+                  {(project.deal_value - (project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)) <= 0 ? (
+                    <Badge variant="success">Paid</Badge>
+                  ) : (
+                    <span className="font-bold text-orange-600">
+                      ₹{(project.deal_value - (project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)).toLocaleString('en-IN')}
+                    </span>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => handleView(project)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t font-semibold">
+                <span className="text-muted-foreground">Profit Margin:</span>
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const income = project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0;
+                    const expenses = project.expenses?.reduce((sum, exp) => sum + exp.total_paid, 0) || 0;
+                    const profit = income - expenses;
+                    return (
+                      <span className={profit >= 0 ? 'text-blue-600' : 'text-red-600'}>
+                        ₹{profit.toLocaleString('en-IN')}
+                      </span>
+                    );
+                  })()}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => handleFinancials(project)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t">
                 <NotesManager
@@ -336,6 +441,20 @@ export default function Projects() {
           </Card>
         ))}
       </div>
+      <PaymentHistoryModal
+        title={selectedProject?.project_id_code || ''}
+        totalLabel="Deal Value"
+        totalAmount={selectedProject?.deal_value || 0}
+        income={selectedProject?.income}
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+      />
+
+      <ProjectFinancialsModal
+        project={selectedProject}
+        isOpen={isFinancialsModalOpen}
+        onClose={() => setIsFinancialsModalOpen(false)}
+      />
     </div>
   )
 }

@@ -1,5 +1,18 @@
 // Database types matching the Supabase schema
 
+export interface Organization {
+  id: string
+  name: string
+  slug: string
+  gst_number: string | null
+  address: string | null
+  phone: string | null
+  notes: Note[]
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Customer {
   id: string
   org_id: string
@@ -76,6 +89,8 @@ export interface Project {
   funding_type: string | null
   status: string | null
   notes: Note[]
+  income?: Income[]
+  expenses?: Expense[]
   deleted_at: string | null
   created_at: string
   updated_at: string
@@ -90,6 +105,10 @@ export interface Income {
   org_id: string
   project_id: string | null
   project?: Project
+  invoice_id: string | null
+  invoice?: Invoice
+  customer_id: string | null
+  customer?: Customer
   bank_account_id: string | null
   bank_account?: BankAccount
   date: string
@@ -103,7 +122,7 @@ export interface Income {
   updated_at: string
 }
 
-export type IncomeInput = Omit<Income, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'bank_account'> & { notes?: Note[] }
+export type IncomeInput = Omit<Income, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'bank_account' | 'invoice' | 'customer'> & { notes?: Note[] }
 
 export interface Expense {
   id: string
@@ -135,6 +154,8 @@ export interface Invoice {
   org_id: string
   project_id: string | null
   project?: Project
+  customer_id: string | null
+  customer?: Customer
   date: string
   invoice_number: string
   taxable_value: number
@@ -143,9 +164,10 @@ export interface Invoice {
   total_amount: number
   invoice_link: string | null
   notes: Note[]
+  income?: Income[]
   deleted_at: string | null
   created_at: string
   updated_at: string
 }
 
-export type InvoiceInput = Omit<Invoice, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project'> & { notes?: Note[] }
+export type InvoiceInput = Omit<Invoice, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'customer'> & { notes?: Note[] }

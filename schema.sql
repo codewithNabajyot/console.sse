@@ -11,6 +11,9 @@ CREATE TABLE organizations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
+    gst_number TEXT,
+    address TEXT,
+    phone TEXT,
     notes JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -191,6 +194,7 @@ CREATE TABLE invoices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     project_id UUID REFERENCES projects(id),
+    customer_id UUID REFERENCES customers(id),
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     invoice_number TEXT NOT NULL,
     taxable_value NUMERIC(15, 2) DEFAULT 0, -- Header summary
@@ -209,6 +213,8 @@ CREATE TABLE income (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     project_id UUID REFERENCES projects(id),
+    customer_id UUID REFERENCES customers(id),
+    invoice_id UUID REFERENCES invoices(id),
     bank_account_id UUID REFERENCES bank_accounts(id),
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     received_from TEXT,
@@ -287,7 +293,10 @@ CREATE INDEX idx_audit_logs_org ON audit_logs(org_id);
 -- Index foreign keys
 CREATE INDEX idx_projects_customer ON projects(customer_id);
 CREATE INDEX idx_invoices_project ON invoices(project_id);
+CREATE INDEX idx_invoices_customer ON invoices(customer_id);
 CREATE INDEX idx_income_project ON income(project_id);
+CREATE INDEX idx_income_customer ON income(customer_id);
+CREATE INDEX idx_income_invoice ON income(invoice_id);
 CREATE INDEX idx_income_bank ON income(bank_account_id);
 CREATE INDEX idx_expenses_project ON expenses(project_id);
 CREATE INDEX idx_expenses_vendor ON expenses(vendor_id);

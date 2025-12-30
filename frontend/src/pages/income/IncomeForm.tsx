@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { useIncomeById, useCreateIncome, useUpdateIncome } from '@/hooks/useIncome'
 import { useProjects } from '@/hooks/useProjects'
+import { useInvoices } from '@/hooks/useInvoices'
+import { useCustomers } from '@/hooks/useCustomers'
 import { useBankAccounts } from '@/hooks/useBankAccounts'
 import { useMasterConfigsByType } from '@/hooks/useMasterConfigs'
 import { Button } from '@/components/ui/button'
@@ -13,7 +15,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import type { IncomeInput } from '@/lib/types'
 
 type FormData = {
+  invoice_id: string
   project_id: string
+  customer_id: string
   bank_account_id: string
   date: string
   received_from: string
@@ -29,6 +33,8 @@ export default function IncomeForm() {
 
   const { data: income, isLoading: isIncomeLoading } = useIncomeById(id)
   const { data: projects, isLoading: isProjectsLoading } = useProjects()
+  const { data: invoices, isLoading: isInvoicesLoading } = useInvoices()
+  const { data: customers, isLoading: isCustomersLoading } = useCustomers()
   const { data: bankAccounts, isLoading: isBanksLoading } = useBankAccounts()
   const { data: categories, isLoading: isCategoriesLoading } = useMasterConfigsByType('INCOME_CATEGORY')
   const { data: paymentModes, isLoading: isModesLoading } = useMasterConfigsByType('PAYMENT_MODE')
@@ -41,9 +47,13 @@ export default function IncomeForm() {
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
+    setValue,
   } = useForm<FormData>({
     defaultValues: {
+      invoice_id: '',
       project_id: '',
+      customer_id: '',
       bank_account_id: '',
       date: new Date().toISOString().split('T')[0],
       received_from: '',
@@ -57,7 +67,9 @@ export default function IncomeForm() {
   useEffect(() => {
     if (income) {
       reset({
+        invoice_id: income.invoice_id || '',
         project_id: income.project_id || '',
+        customer_id: income.customer_id || '',
         bank_account_id: income.bank_account_id || '',
         date: income.date,
         received_from: income.received_from || '',
@@ -68,9 +80,42 @@ export default function IncomeForm() {
     }
   }, [income, reset])
 
+  const selectedInvoiceId = watch('invoice_id')
+  const selectedProjectId = watch('project_id')
+
+  // Auto-fill project and customer if invoice is selected
+  useEffect(() => {
+    if (selectedInvoiceId) {
+      const invoice = invoices?.find(inv => inv.id === selectedInvoiceId)
+      if (invoice) {
+        if (invoice.project_id) setValue('project_id', invoice.project_id)
+        if (invoice.customer_id) setValue('customer_id', invoice.customer_id)
+        
+        // Also set received_from if empty
+        const customerName = invoice.customer?.name || invoice.project?.customer?.name
+        if (customerName) {
+          setValue('received_from', customerName)
+        }
+      }
+    }
+  }, [selectedInvoiceId, invoices, setValue])
+
+  // Auto-fill customer if project is selected (and no invoice)
+  useEffect(() => {
+    if (selectedProjectId && !selectedInvoiceId) {
+      const project = projects?.find(p => p.id === selectedProjectId)
+      if (project) {
+        if (project.customer_id) setValue('customer_id', project.customer_id)
+        if (project.customer?.name) setValue('received_from', project.customer.name)
+      }
+    }
+  }, [selectedProjectId, selectedInvoiceId, projects, setValue])
+
   const onSubmit = async (data: FormData) => {
     const input: IncomeInput = {
+      invoice_id: data.invoice_id || null,
       project_id: data.project_id || null,
+      customer_id: data.customer_id || null,
       bank_account_id: data.bank_account_id || null,
       date: data.date,
       received_from: data.received_from || null,
@@ -95,7 +140,7 @@ export default function IncomeForm() {
     navigate(`/${orgSlug}/income`)
   }
 
-  const isLoading = isIncomeLoading || isProjectsLoading || isBanksLoading || isCategoriesLoading || isModesLoading
+  const isLoading = isIncomeLoading || isProjectsLoading || isInvoicesLoading || isCustomersLoading || isBanksLoading || isCategoriesLoading || isModesLoading
 
   if (isLoading && isEditMode) {
     return (
@@ -124,21 +169,65 @@ export default function IncomeForm() {
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Project Selection */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Invoice Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="invoice_id">Invoice (Optional)</Label>
+                <select
+                  id="invoice_id"
+                  {...register('invoice_id')}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">No Invoice</option>
+                  {invoices?.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.invoice_number} - {inv.customer?.name || inv.project?.customer?.name} (₹{inv.total_amount})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Project Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="project_id">Project (Optional)</Label>
+                <select
+                  id="project_id"
+                  {...register('project_id')}
+                  disabled={!!selectedInvoiceId}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">No Project</option>
+                  {projects?.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.project_id_code} - {project.customer?.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="project_id">Project (Optional)</Label>
+              <Label htmlFor="customer_id">
+                Customer <span className="text-destructive">*</span>
+              </Label>
               <select
-                id="project_id"
-                {...register('project_id')}
+                id="customer_id"
+                {...register('customer_id', { 
+                  required: !selectedInvoiceId && !selectedProjectId ? 'Customer is required' : false 
+                })}
+                disabled={!!selectedInvoiceId || !!selectedProjectId}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="">Common / No Project</option>
-                {projects?.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.project_id_code} - {project.customer?.name}
+                <option value="">Select Customer</option>
+                {customers?.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
                   </option>
                 ))}
               </select>
+              {errors.customer_id && (
+                <p className="text-sm text-destructive">{errors.customer_id.message}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
