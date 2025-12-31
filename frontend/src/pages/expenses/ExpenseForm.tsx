@@ -255,6 +255,7 @@ export default function ExpenseForm() {
                   <option value="12">12%</option>
                   <option value="18">18%</option>
                   <option value="28">28%</option>
+                  <option value="100">100% (only for GST Payment)</option>
                 </select>
               </div>
             </div>
