@@ -14,8 +14,9 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { format, isSameMonth, isSameYear, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils'
-import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, Download } from 'lucide-react'
 import { MobileTransactionCard } from '@/components/MobileTransactionCard'
+import { utils, writeFile } from 'xlsx'
 
 const BankTransactions: React.FC = () => {
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useBankAccounts()
@@ -124,6 +125,74 @@ const BankTransactions: React.FC = () => {
     }, { income: 0, expense: 0 })
   }, [filteredTransactions])
 
+  const handleExport = () => {
+    // 1. Create Filter Summary Data
+    const filterSummary = [
+      ['Bank Statement Export'],
+      ['Generated On', format(new Date(), 'dd MMM yyyy HH:mm')],
+      [],
+      ['Filters Applied:'],
+      ['Bank Account', selectedBankId === 'all' ? 'All Bank Accounts' : bankAccounts?.find(b => b.id === selectedBankId)?.account_name || selectedBankId],
+      ['Type', selectedType === 'all' ? 'All Types' : selectedType === 'income' ? 'Income Only' : 'Expense Only'],
+      ['Category', selectedCategory === 'all' ? 'All Categories' : selectedCategory],
+      ['Year', selectedYear],
+      ['Month', selectedMonth === 'all' ? 'All Months' : months.find(m => m.value === selectedMonth)?.label],
+      [],
+      ['Transaction Details']
+    ]
+
+    // 2. Prepare Transaction Data
+    const transactionHeaders = ['Date', 'Type', 'Category', 'Description', 'Bank', 'Reference', 'Income', 'Expense']
+    
+    const transactionData = filteredTransactions.map(tx => [
+      format(parseISO(tx.date), 'dd MMM yyyy'),
+      tx.type.toUpperCase(),
+      tx.category,
+      tx.description,
+      tx.bank,
+      tx.reference,
+      tx.type === 'income' ? tx.amount : '',
+      tx.type === 'expense' ? tx.amount : ''
+    ])
+
+    // Calculate totals for export
+    const totalRow = [
+      'TOTAL', '', '', '', '', '',
+      totals.income,
+      totals.expense
+    ]
+
+    // 3. Combine all data
+    const wsData = [
+      ...filterSummary,
+      transactionHeaders,
+      ...transactionData,
+      [],
+      totalRow
+    ]
+
+    // 4. Create Workbook and Worksheet
+    const wb = utils.book_new()
+    const ws = utils.aoa_to_sheet(wsData)
+
+    // Optional: Set column widths
+    ws['!cols'] = [
+      { wch: 15 }, // Date
+      { wch: 10 }, // Type
+      { wch: 20 }, // Category
+      { wch: 30 }, // Description
+      { wch: 20 }, // Bank
+      { wch: 15 }, // Reference
+      { wch: 12 }, // Income
+      { wch: 12 }  // Expense
+    ]
+
+    utils.book_append_sheet(wb, ws, 'Bank Statement')
+
+    // 5. Save File
+    writeFile(wb, `Bank_Statement_${selectedYear}_${selectedMonth === 'all' ? 'All' : months.find(m => m.value === selectedMonth)?.label}.xlsx`)
+  }
+
   if (isLoadingAccounts || isLoadingIncome || isLoadingExpenses) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -141,6 +210,13 @@ const BankTransactions: React.FC = () => {
             Track bank-wise income and expenses
           </p>
         </div>
+        <button
+          onClick={handleExport}
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+        >
+          <Download className="h-4 w-4" />
+          Export to Excel
+        </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">

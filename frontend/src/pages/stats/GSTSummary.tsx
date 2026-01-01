@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useInvoices } from '@/hooks/useInvoices'
 import { useExpenses } from '@/hooks/useExpenses'
+import { useIncome } from '@/hooks/useIncome'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -10,12 +11,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { format, startOfMonth, endOfMonth, isWithinInterval, addMonths } from 'date-fns'
+import { format, startOfMonth, endOfMonth, isWithinInterval, addMonths, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { Download, Loader2 } from 'lucide-react'
+import { utils, writeFile } from 'xlsx'
 
 const GSTSummary: React.FC = () => {
   const { data: invoices, isLoading: isLoadingInvoices } = useInvoices()
   const { data: expenses, isLoading: isLoadingExpenses } = useExpenses()
+  const { data: income, isLoading: isLoadingIncome } = useIncome()
+  const [isExporting, setIsExporting] = useState(false)
   
   // Financial Year Selection
   const currentYear = new Date().getFullYear()
@@ -84,7 +89,136 @@ const GSTSummary: React.FC = () => {
     }), { outputTax: 0, inputTax: 0, netGST: 0 })
   }, [stats])
 
-  if (isLoadingInvoices || isLoadingExpenses) {
+  const handleCAExport = async () => {
+    if (!invoices || !expenses || !income) return
+
+    try {
+      setIsExporting(true)
+      const startDate = new Date(selectedFY, 3, 1) // April 1st
+      const endDate = new Date(selectedFY + 1, 2, 31, 23, 59, 59) // March 31st end of day
+
+      const dateFilter = (dateStr: string) => {
+        const date = parseISO(dateStr)
+        return isWithinInterval(date, { start: startDate, end: endDate })
+      }
+
+      // Filter Data
+      const fyInvoices = invoices.filter(inv => dateFilter(inv.date))
+      const fyExpenses = expenses.filter(exp => dateFilter(exp.date))
+      const fyIncome = income.filter(inc => dateFilter(inc.date))
+
+      // --- Sheet 1: GST Summary ---
+      const summaryHeaders = ['Month', 'Output Tax (Sales)', 'Input Tax (Expenses)', 'Net GST Payable']
+      const summaryData = stats.map(s => [
+        s.month,
+        s.outputTax,
+        s.inputTax,
+        s.netGST
+      ])
+      const summaryTotal = ['Total', totals.outputTax, totals.inputTax, totals.netGST]
+      
+      const wsSummary = utils.aoa_to_sheet([
+        [`GST Summary for FY ${selectedFY}-${(selectedFY + 1) % 100}`],
+        [],
+        summaryHeaders,
+        ...summaryData,
+        [],
+        summaryTotal
+      ])
+
+      // --- Sheet 2: Invoices (Sales) ---
+      const invoiceHeaders = ['Date', 'Invoice #', 'Customer', 'GSTIN', 'Taxable Amount', 'IGST', 'CGST', 'SGST', 'Total Tax', 'Total Amount']
+      const invoiceData = fyInvoices.map(inv => [
+        format(parseISO(inv.date), 'dd/MM/yyyy'),
+        inv.invoice_number,
+        inv.customer?.name || 'N/A',
+        inv.customer?.gst_number || 'N/A',
+        (inv.taxable_value || 0),
+        0, // Placeholder for IGST separation if needed later
+        (inv.gst_amount || 0) / 2, // Assuming equal split for now if intra-state
+        (inv.gst_amount || 0) / 2,
+        inv.gst_amount || 0,
+        inv.total_amount
+      ])
+      
+      const wsInvoices = utils.aoa_to_sheet([
+        [`Invoices for FY ${selectedFY}-${(selectedFY + 1) % 100}`],
+        [],
+        invoiceHeaders,
+        ...invoiceData
+      ])
+
+      // --- Sheet 3: Bank Transactions ---
+      // Combine Income and Expenses
+      // --- Sheet 3: Bank Transactions ---
+      // Combine Income and Expenses
+      const bankTxHeaders = ['Date', 'Type', 'Category', 'Description/party', 'Bank Account', 'Reference', 'GST %', 'GST Amount', 'Payment Mode', 'Vendor/Customer Name', 'Vendor Invoice #', 'Credit (Income)', 'Debit (Expense)']
+      
+      const incomeRows = fyIncome.map(inc => ({
+        date: inc.date,
+        row: [
+          format(parseISO(inc.date), 'dd/MM/yyyy'),
+          'Income',
+          inc.category || 'Income',
+          inc.received_from || '',
+          inc.bank_account?.account_name || 'N/A',
+          inc.invoice?.invoice_number || '', // Using Invoice # as Reference for Income
+          inc.invoice?.gst_percentage || '', // GST % from Invoice if available
+          '', // GST Amount blank for Income (Output Tax) per user request
+          inc.payment_mode || '',
+          inc.customer?.name || inc.received_from || '', // Vendor/Customer Name
+          '', // Vendor Invoice # not applicable for Income
+          inc.amount,
+          ''
+        ]
+      }))
+
+      const expenseRows = fyExpenses.map(exp => ({
+        date: exp.date,
+        row: [
+          format(parseISO(exp.date), 'dd/MM/yyyy'),
+          'Expense',
+          exp.category || 'Expense',
+          exp.description || '',
+          exp.bank_account?.account_name || 'N/A',
+          '',
+          exp.gst_percentage || '',
+          exp.gst_amount || '',
+          '', // Payment Mode not currently tracked for expenses in DB/UI
+          exp.vendor?.name || '',
+          exp.vendor_invoice_number || '',
+          '',
+          exp.total_paid
+        ]
+      }))
+
+      const allBankRows = [...incomeRows, ...expenseRows]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map(item => item.row)
+
+      const wsBankTx = utils.aoa_to_sheet([
+        [`Bank Transactions for FY ${selectedFY}-${(selectedFY + 1) % 100}`],
+        [],
+        bankTxHeaders,
+        ...allBankRows
+      ])
+
+      // Create Workbook
+      const wb = utils.book_new()
+      utils.book_append_sheet(wb, wsSummary, "GST Summary")
+      utils.book_append_sheet(wb, wsInvoices, "Invoices")
+      utils.book_append_sheet(wb, wsBankTx, "Bank Transactions")
+
+      // Save
+      writeFile(wb, `CA_Data_FY_${selectedFY}-${(selectedFY+1)%100}.xlsx`)
+    } catch (error) {
+      console.error('Export failed:', error)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  if (isLoadingInvoices || isLoadingExpenses || isLoadingIncome) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-muted-foreground animate-pulse">Calculating GST stats...</div>
@@ -101,19 +235,28 @@ const GSTSummary: React.FC = () => {
             Month-wise Output vs Input GST comparison
           </p>
         </div>
-        
-        <div className="w-full sm:w-48">
-          <select 
-            value={selectedFY} 
-            onChange={(e) => setSelectedFY(parseInt(e.target.value))}
-            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleCAExport}
+            disabled={isExporting}
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
           >
-            {financialYears.map(year => (
-              <option key={year} value={year}>
-                FY {year}-{((year + 1) % 100).toString().padStart(2, '0')}
-              </option>
-            ))}
-          </select>
+            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Export for CA
+          </button>
+          <div className="w-full sm:w-48">
+            <select 
+              value={selectedFY} 
+              onChange={(e) => setSelectedFY(parseInt(e.target.value))}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              {financialYears.map(year => (
+                <option key={year} value={year}>
+                  FY {year}-{((year + 1) % 100).toString().padStart(2, '0')}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
