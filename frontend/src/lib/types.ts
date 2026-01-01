@@ -141,13 +141,47 @@ export interface Expense {
   gst_amount: number
   taxable_value: number
   vendor_invoice_number: string | null
+  expense_number?: string
   notes: Note[]
+  allocations?: PaymentAllocation[]
   deleted_at: string | null
   created_at: string
   updated_at: string
 }
 
 export type ExpenseInput = Omit<Expense, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'vendor' | 'bank_account'> & { notes?: Note[] }
+
+export interface ExpensePayment {
+  id: string
+  org_id: string
+  vendor_id: string | null
+  vendor?: Vendor
+  bank_account_id: string | null
+  bank_account?: BankAccount
+  project_id: string | null
+  project?: Project
+  date: string
+  amount: number
+  payment_number?: string
+  payment_mode: string | null
+  notes: Note[]
+  allocations?: PaymentAllocation[]
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ExpensePaymentInput = Omit<ExpensePayment, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'vendor' | 'bank_account' | 'project'> & { notes?: Note[] }
+
+export interface PaymentAllocation {
+  id: string
+  payment_id: string
+  expense_id: string
+  expense?: Expense
+  payment?: ExpensePayment
+  amount: number
+  created_at: string
+}
 
 export interface Invoice {
   id: string
@@ -171,3 +205,20 @@ export interface Invoice {
 }
 
 export type InvoiceInput = Omit<Invoice, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'customer'> & { notes?: Note[] }
+
+export interface BankTransfer {
+  id: string
+  org_id: string
+  from_account_id: string
+  to_account_id: string
+  from_account?: BankAccount
+  to_account?: BankAccount
+  amount: number
+  date: string
+  notes: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export type BankTransferInput = Omit<BankTransfer, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'from_account' | 'to_account'>

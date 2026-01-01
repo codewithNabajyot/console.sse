@@ -308,20 +308,23 @@ export default function ExpenseForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="bank_account_id">
-                  Paid From <span className="text-destructive">*</span>
+                  Paid From
                 </Label>
                 <select
                   id="bank_account_id"
-                  {...register('bank_account_id', { required: 'Bank account is required' })}
+                  {...register('bank_account_id')}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="">Select Bank Account</option>
+                  <option value="">Select Bank Account (Leave empty if Unpaid)</option>
                   {bankAccounts?.map((bank) => (
                     <option key={bank.id} value={bank.id}>
                       {bank.account_name} ({bank.bank_name})
                     </option>
                   ))}
                 </select>
+                <p className="text-[10px] text-muted-foreground pt-1">
+                  Select for direct payment. Leave empty for credit/unpaid bill.
+                </p>
               </div>
               {/* Spacer/Placeholder for potential Payment Mode */}
               <div className="hidden sm:block"></div>

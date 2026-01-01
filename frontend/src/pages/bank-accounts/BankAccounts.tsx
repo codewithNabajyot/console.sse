@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, ArrowRightLeft } from 'lucide-react'
 import { useBankAccounts, useDeleteBankAccount, useUpdateBankAccount } from '@/hooks/useBankAccounts'
+import { InternalTransferModal } from '@/components/bank-accounts/InternalTransferModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,6 +35,7 @@ export default function BankAccounts() {
   const { data: bankAccounts, isLoading } = useBankAccounts()
   const deleteBankAccount = useDeleteBankAccount()
   const updateBankAccount = useUpdateBankAccount()
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
 
   const filteredBankAccounts = bankAccounts?.filter((account) =>
     account.account_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -71,12 +73,18 @@ export default function BankAccounts() {
             Manage your bank accounts and track balances
           </p>
         </div>
-        <Button asChild>
-          <Link to={`/${orgSlug}/bank-accounts/new`}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Bank Account
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsTransferModalOpen(true)}>
+            <ArrowRightLeft className="mr-2 h-4 w-4" />
+            Transfer Money
+          </Button>
+          <Button asChild>
+            <Link to={`/${orgSlug}/bank-accounts/new`}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Bank Account
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -263,6 +271,11 @@ export default function BankAccounts() {
           ))
         )}
       </div>
+
+      <InternalTransferModal 
+        isOpen={isTransferModalOpen} 
+        onClose={() => setIsTransferModalOpen(false)} 
+      />
     </div>
   )
 }

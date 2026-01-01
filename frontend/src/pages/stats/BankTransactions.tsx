@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useBankAccounts } from '@/hooks/useBankAccounts'
-import { useIncome } from '@/hooks/useIncome'
-import { useExpenses } from '@/hooks/useExpenses'
+import { useBankTransactions } from '@/hooks/useBankTransactions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -20,8 +19,7 @@ import { utils, writeFile } from 'xlsx'
 
 const BankTransactions: React.FC = () => {
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useBankAccounts()
-  const { data: income, isLoading: isLoadingIncome } = useIncome()
-  const { data: expenses, isLoading: isLoadingExpenses } = useExpenses()
+  const { data: transactions, isLoading: isLoadingTransactions } = useBankTransactions()
   
   const [selectedBankId, setSelectedBankId] = useState<string>('all')
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString())
@@ -52,67 +50,35 @@ const BankTransactions: React.FC = () => {
 
   const categories = useMemo(() => {
     const cats = new Set<string>()
-    if (income) income.forEach(inc => { if (inc.category) cats.add(inc.category) })
-    if (expenses) expenses.forEach(exp => { if (exp.category) cats.add(exp.category) })
+    if (transactions) transactions.forEach(t => { if (t.category) cats.add(t.category) })
     return Array.from(cats).sort()
-  }, [income, expenses])
+  }, [transactions])
 
   const filteredTransactions = useMemo(() => {
-    if (!income || !expenses) return []
+    if (!transactions) return []
 
     const year = parseInt(selectedYear)
     const month = selectedMonth === 'all' ? null : parseInt(selectedMonth)
 
-    const dateFilter = (dateStr: string) => {
-      const date = parseISO(dateStr)
-      if (month !== null) {
-        return isSameMonth(date, new Date(year, month, 1)) && isSameYear(date, new Date(year, month, 1))
-      }
-      return isSameYear(date, new Date(year, 0, 1))
-    }
+    return transactions.filter(tx => {
+       // Date Filter
+       const date = parseISO(tx.date)
+       const matchYear = isSameYear(date, new Date(year, 0, 1))
+       const matchMonth = month === null || isSameMonth(date, new Date(year, month, 1))
+       if (!matchYear || !matchMonth) return false
 
-    const bankFilter = (bankId: string | null) => {
-      if (selectedBankId === 'all') return true
-      return bankId === selectedBankId
-    }
+       // Bank Filter
+       if (selectedBankId !== 'all' && tx.bank_account_id !== selectedBankId) return false
 
-    const categoryFilter = (cat: string | null) => {
-      if (selectedCategory === 'all') return true
-      return cat === selectedCategory
-    }
+       // Type Filter
+       if (selectedType !== 'all' && tx.type !== selectedType) return false
 
-    const incomeList = (selectedType === 'all' || selectedType === 'income') 
-      ? income
-          .filter(inc => dateFilter(inc.date) && bankFilter(inc.bank_account_id) && categoryFilter(inc.category || 'Income'))
-          .map(inc => ({
-            id: inc.id,
-            date: inc.date,
-            type: 'income' as const,
-            category: inc.category || 'Income',
-            description: inc.received_from || 'Income',
-            amount: inc.amount,
-            bank: inc.bank_account?.account_name || 'N/A',
-            reference: inc.payment_mode || ''
-          }))
-      : []
+       // Category Filter
+       if (selectedCategory !== 'all' && tx.category !== selectedCategory) return false
 
-    const expenseList = (selectedType === 'all' || selectedType === 'expense')
-      ? expenses
-          .filter(exp => dateFilter(exp.date) && bankFilter(exp.bank_account_id) && categoryFilter(exp.category || 'Expense'))
-          .map(exp => ({
-            id: exp.id,
-            date: exp.date,
-            type: 'expense' as const,
-            category: exp.category || 'Expense',
-            description: exp.description || 'Expense',
-            amount: exp.total_paid,
-            bank: exp.bank_account?.account_name || 'N/A',
-            reference: exp.vendor_invoice_number || ''
-          }))
-      : []
-
-    return [...incomeList, ...expenseList].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [income, expenses, selectedBankId, selectedYear, selectedMonth, selectedType, selectedCategory])
+       return true
+    })
+  }, [transactions, selectedBankId, selectedYear, selectedMonth, selectedType, selectedCategory])
 
   const totals = useMemo(() => {
     return filteredTransactions.reduce((acc, curr) => {
@@ -149,7 +115,7 @@ const BankTransactions: React.FC = () => {
       tx.type.toUpperCase(),
       tx.category,
       tx.description,
-      tx.bank,
+      tx.bank_name,
       tx.reference,
       tx.type === 'income' ? tx.amount : '',
       tx.type === 'expense' ? tx.amount : ''
@@ -193,7 +159,7 @@ const BankTransactions: React.FC = () => {
     writeFile(wb, `Bank_Statement_${selectedYear}_${selectedMonth === 'all' ? 'All' : months.find(m => m.value === selectedMonth)?.label}.xlsx`)
   }
 
-  if (isLoadingAccounts || isLoadingIncome || isLoadingExpenses) {
+  if (isLoadingAccounts || isLoadingTransactions) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-muted-foreground animate-pulse">Loading transactions...</div>
@@ -361,7 +327,7 @@ const BankTransactions: React.FC = () => {
                         {tx.description}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {tx.bank}
+                        {tx.bank_name}
                       </TableCell>
                       <TableCell className={cn(
                         "text-right font-semibold",
@@ -391,7 +357,7 @@ const BankTransactions: React.FC = () => {
             fields={[
               { label: 'Reference', value: tx.reference },
               { label: 'Category', value: tx.category },
-              { label: 'Bank', value: tx.bank },
+              { label: 'Bank', value: tx.bank_name },
               { 
                 label: 'Amount', 
                 value: `₹${tx.amount.toLocaleString('en-IN')}`, 

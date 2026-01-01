@@ -142,22 +142,40 @@ DECLARE
     v_amount NUMERIC;
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        v_bank_id := NEW.bank_account_id;
-        v_amount := -NEW.total_paid;
+        IF NEW.bank_account_id IS NOT NULL THEN
+            v_bank_id := NEW.bank_account_id;
+            v_amount := -NEW.total_paid;
+        END IF;
     ELSIF (TG_OP = 'UPDATE') THEN
-        IF (OLD.bank_account_id != NEW.bank_account_id) THEN
-            -- Add back to old bank (it was a deduction)
+        -- Case 1: Was unpaid (NULL), now Paid (Not NULL)
+        IF OLD.bank_account_id IS NULL AND NEW.bank_account_id IS NOT NULL THEN
+            v_bank_id := NEW.bank_account_id;
+            v_amount := -NEW.total_paid;
+        
+        -- Case 2: Was Paid (Not NULL), now Unpaid (NULL)
+        ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NULL THEN
+            -- Refund the old bank
+            UPDATE bank_accounts SET current_balance = current_balance + OLD.total_paid WHERE id = OLD.bank_account_id;
+            
+        -- Case 3: Changed Bank (Both Not NULL)
+        ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NOT NULL AND OLD.bank_account_id != NEW.bank_account_id THEN
+            -- Add back to old bank
             UPDATE bank_accounts SET current_balance = current_balance + OLD.total_paid WHERE id = OLD.bank_account_id;
             -- Deduct from new bank
             v_bank_id := NEW.bank_account_id;
             v_amount := -NEW.total_paid;
-        ELSE
+
+        -- Case 4: Same Bank, maybe Changed Amount
+        ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NOT NULL THEN
             v_bank_id := NEW.bank_account_id;
             v_amount := -(NEW.total_paid - OLD.total_paid);
         END IF;
+
     ELSIF (TG_OP = 'DELETE') THEN
-        v_bank_id := OLD.bank_account_id;
-        v_amount := OLD.total_paid;
+        IF OLD.bank_account_id IS NOT NULL THEN
+            v_bank_id := OLD.bank_account_id;
+            v_amount := OLD.total_paid;
+        END IF;
     END IF;
 
     IF v_bank_id IS NOT NULL THEN
@@ -242,11 +260,29 @@ CREATE TABLE expenses (
     gst_amount NUMERIC(15, 2) DEFAULT 0, -- Header summary
     taxable_value NUMERIC(15, 2) DEFAULT 0, -- Header summary
     vendor_invoice_number TEXT,
+    expense_number TEXT, -- Auto-generated EXP-1001
     notes JSONB DEFAULT '[]'::jsonb,
     deleted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Expense Number Sequence & Trigger
+CREATE SEQUENCE IF NOT EXISTS expense_number_seq START 1001;
+
+CREATE OR REPLACE FUNCTION assign_expense_number()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.expense_number IS NULL THEN
+        NEW.expense_number := 'EXP-' || nextval('expense_number_seq')::TEXT;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_assign_expense_number
+BEFORE INSERT ON expenses
+FOR EACH ROW EXECUTE FUNCTION assign_expense_number();
 
 -- ATTACHMENTS (Google Drive Links)
 CREATE TABLE attachments (
@@ -428,8 +464,158 @@ CREATE POLICY "Users can manage expenses" ON expenses FOR ALL TO authenticated U
 
 -- 9. COMMENTS FOR DOCUMENTATION
 
+-- EXPENSE PAYMENTS (Vendor Advances / Settlements)
+CREATE TABLE expense_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    vendor_id UUID REFERENCES vendors(id),
+    bank_account_id UUID REFERENCES bank_accounts(id),
+    project_id UUID REFERENCES projects(id), -- Optional: Tag advance to a project
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    amount NUMERIC(15, 2) DEFAULT 0,
+    payment_number TEXT, -- Auto-generated PAY-1001
+    payment_mode TEXT,
+    notes JSONB DEFAULT '[]'::jsonb,
+    deleted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Payment Number Sequence & Trigger
+CREATE SEQUENCE IF NOT EXISTS expense_payment_number_seq START 1001;
+
+CREATE OR REPLACE FUNCTION assign_payment_number()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.payment_number IS NULL THEN
+        NEW.payment_number := 'VPAY-' || nextval('expense_payment_number_seq')::TEXT;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_assign_payment_number
+BEFORE INSERT ON expense_payments
+FOR EACH ROW EXECUTE FUNCTION assign_payment_number();
+
+-- PAYMENT ALLOCATIONS (Linking Payments to Expenses)
+CREATE TABLE payment_allocations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    payment_id UUID NOT NULL REFERENCES expense_payments(id) ON DELETE CASCADE,
+    expense_id UUID NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+    amount NUMERIC(15, 2) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for Payments
+CREATE INDEX idx_exp_payments_org ON expense_payments(org_id);
+CREATE INDEX idx_exp_payments_vendor ON expense_payments(vendor_id);
+CREATE INDEX idx_exp_payments_bank ON expense_payments(bank_account_id);
+CREATE INDEX idx_exp_payments_project ON expense_payments(project_id);
+CREATE INDEX idx_pay_alloc_payment ON payment_allocations(payment_id);
+CREATE INDEX idx_pay_alloc_expense ON payment_allocations(expense_id);
+
+-- RLS for Payments
+ALTER TABLE expense_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payment_allocations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage expense payments" ON expense_payments FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+CREATE POLICY "Users can manage allocations" ON payment_allocations FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Trigger for 'updated_at' on expense_payments
+CREATE TRIGGER update_expense_payments_updated BEFORE UPDATE ON expense_payments FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- Function for Payment Balance Update
+CREATE OR REPLACE FUNCTION update_bank_balance_payment()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_bank_id UUID;
+    v_amount NUMERIC;
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        v_bank_id := NEW.bank_account_id;
+        v_amount := -NEW.amount;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        IF (OLD.bank_account_id != NEW.bank_account_id) THEN
+            -- Add back to old bank
+            UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.bank_account_id;
+            -- Deduct from new bank
+            v_bank_id := NEW.bank_account_id;
+            v_amount := -NEW.amount;
+        ELSE
+            v_bank_id := NEW.bank_account_id;
+            v_amount := -(NEW.amount - OLD.amount);
+        END IF;
+    ELSIF (TG_OP = 'DELETE') THEN
+        v_bank_id := OLD.bank_account_id;
+        v_amount := OLD.amount;
+    END IF;
+
+    IF v_bank_id IS NOT NULL THEN
+        UPDATE bank_accounts SET current_balance = current_balance + v_amount WHERE id = v_bank_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger for Payment Balance
+CREATE TRIGGER trg_expense_payment_balance AFTER INSERT OR UPDATE OR DELETE ON expense_payments FOR EACH ROW EXECUTE FUNCTION update_bank_balance_payment();
+
+-- 10. COMMENTS FOR DOCUMENTATION
+
 COMMENT ON TABLE organizations IS 'Multi-tenant organizations. Default: Suryasathi Solar';
 COMMENT ON TABLE org_roles IS 'Role-based access control. Default roles: Admin, Read Only';
 COMMENT ON TABLE profiles IS 'User profiles linked to auth.users. Auto-created on signup with Read Only role';
 COMMENT ON FUNCTION handle_new_user() IS 'Automatically creates a profile for new users and assigns them to the default organization with Read Only role';
 COMMENT ON COLUMN bank_accounts.current_balance IS 'Cached real-time balance maintained by triggers on income/expenses tables';
+
+-- 11. INTERNAL BANK TRANSFERS
+CREATE TABLE bank_transfers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    from_account_id UUID NOT NULL REFERENCES bank_accounts(id),
+    to_account_id UUID NOT NULL REFERENCES bank_accounts(id),
+    amount NUMERIC(15, 2) NOT NULL DEFAULT 0,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
+    CONSTRAINT different_accounts CHECK (from_account_id != to_account_id)
+);
+
+-- Indexes for Transfers
+CREATE INDEX idx_bank_transfers_org ON bank_transfers(org_id);
+CREATE INDEX idx_bank_transfers_from ON bank_transfers(from_account_id);
+CREATE INDEX idx_bank_transfers_to ON bank_transfers(to_account_id);
+
+-- RLS for Transfers
+ALTER TABLE bank_transfers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage bank transfers" ON bank_transfers FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+
+-- Trigger for 'updated_at' on bank_transfers
+CREATE TRIGGER update_bank_transfers_updated BEFORE UPDATE ON bank_transfers FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- Balance Trigger Function for Transfers
+CREATE OR REPLACE FUNCTION update_bank_balance_transfer()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        UPDATE bank_accounts SET current_balance = current_balance - NEW.amount WHERE id = NEW.from_account_id;
+        UPDATE bank_accounts SET current_balance = current_balance + NEW.amount WHERE id = NEW.to_account_id;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.from_account_id;
+        UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.to_account_id;
+        UPDATE bank_accounts SET current_balance = current_balance - NEW.amount WHERE id = NEW.from_account_id;
+        UPDATE bank_accounts SET current_balance = current_balance + NEW.amount WHERE id = NEW.to_account_id;
+    ELSIF (TG_OP = 'DELETE') THEN
+        UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.from_account_id;
+        UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.to_account_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_bank_transfer_balance 
+AFTER INSERT OR UPDATE OR DELETE ON bank_transfers 
+FOR EACH ROW EXECUTE FUNCTION update_bank_balance_transfer();

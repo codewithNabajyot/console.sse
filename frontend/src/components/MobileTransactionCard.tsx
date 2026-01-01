@@ -32,9 +32,11 @@ interface MobileTransactionCardProps {
     entityName: string
   }
   editLink?: string
+  onEdit?: () => void
   onDelete?: () => void
   deleteTitle?: string
   deleteDescription?: string
+  children?: React.ReactNode
 }
 
 export function MobileTransactionCard({
@@ -43,6 +45,7 @@ export function MobileTransactionCard({
   fields,
   notesProps,
   editLink,
+  onEdit,
   onDelete,
   deleteTitle = "Delete Record",
   deleteDescription = "Are you sure you want to delete this record? This action cannot be undone."
@@ -65,7 +68,7 @@ export function MobileTransactionCard({
           </div>
         ))}
         
-        {(notesProps || editLink || onDelete) && (
+        {(notesProps || editLink || onEdit || onDelete) && (
           <div className="flex justify-end gap-2 pt-2 border-t mt-3">
             {notesProps && (
               <div className="text-primary">
@@ -78,12 +81,18 @@ export function MobileTransactionCard({
               </div>
             )}
             
-            {editLink && (
+            {editLink && !onEdit && (
               <Button variant="ghost" size="icon" asChild>
                 <Link to={editLink}>
                   <Pencil className="h-4 w-4" />
                 </Link>
               </Button>
+            )}
+
+            {onEdit && (
+               <Button variant="ghost" size="icon" onClick={onEdit}>
+                  <Pencil className="h-4 w-4" />
+               </Button>
             )}
 
             {onDelete && (
