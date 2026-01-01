@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { useExpenseById, useCreateExpense, useUpdateExpense } from '@/hooks/useExpenses'
@@ -29,7 +29,12 @@ type FormData = {
 export default function ExpenseForm() {
   const { orgSlug, id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const isEditMode = !!id
+
+  // Get category from query param if available
+  const queryParams = new URLSearchParams(location.search)
+  const preSelectedCategory = queryParams.get('category')
 
   const { data: expense, isLoading: isExpenseLoading } = useExpenseById(id)
   const { data: projects, isLoading: isProjectsLoading } = useProjects()
@@ -49,6 +54,7 @@ export default function ExpenseForm() {
     formState: { errors },
     reset,
     watch,
+    setValue
   } = useForm<FormData>({
     defaultValues: {
       project_id: '',
@@ -56,12 +62,29 @@ export default function ExpenseForm() {
       bank_account_id: '',
       date: new Date().toISOString().split('T')[0],
       description: '',
-      category: '',
+      category: preSelectedCategory || '',
       total_paid: 0,
       gst_percentage: 0,
       vendor_invoice_number: '',
     },
   })
+
+  // Set category if it comes from query params (e.g. from GST Summary)
+  useEffect(() => {
+    if (preSelectedCategory) {
+      setValue('category', preSelectedCategory)
+      setValue('gst_percentage', 0)
+    }
+  }, [preSelectedCategory, setValue])
+
+  const selectedCategory = watch('category')
+
+  // Auto-set GST to 0 if category is for tax payment
+  useEffect(() => {
+    if (selectedCategory === 'STATUTORY_GST_PAYMENT') {
+      setValue('gst_percentage', 0)
+    }
+  }, [selectedCategory, setValue])
 
   const selectedProjectId = watch('project_id')
   const categories = selectedProjectId ? projectCategories : commonCategories
@@ -248,6 +271,7 @@ export default function ExpenseForm() {
                 <select
                   id="gst_percentage"
                   {...register('gst_percentage')}
+                  disabled={selectedCategory === 'STATUTORY_GST_PAYMENT'}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="0">0%</option>
@@ -255,8 +279,10 @@ export default function ExpenseForm() {
                   <option value="12">12%</option>
                   <option value="18">18%</option>
                   <option value="28">28%</option>
-                  <option value="100">100% (only for GST Payment)</option>
                 </select>
+                {selectedCategory === 'STATUTORY_GST_PAYMENT' && (
+                  <p className="text-[10px] text-primary font-bold mt-1">Forced to 0% for tax payments</p>
+                )}
               </div>
             </div>
 
