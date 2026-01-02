@@ -98,6 +98,7 @@ export function useUpdateExpensePayment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expense_payments', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['expenses', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
       toast.success('Payment updated successfully')
     },
@@ -127,6 +128,7 @@ export function useDeleteExpensePayment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expense_payments', orgId] })
+      queryClient.invalidateQueries({ queryKey: ['expenses', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
       toast.success('Payment deleted successfully')
     },
@@ -174,6 +176,8 @@ export function useCreatePaymentAllocations() {
 // Delete allocation (Unlink)
 export function useDeletePaymentAllocation() {
   const queryClient = useQueryClient()
+  const { profile } = useAuth()
+  const orgId = profile?.org_id
   
   return useMutation({
     mutationFn: async (id: string) => {
@@ -186,8 +190,8 @@ export function useDeletePaymentAllocation() {
     },
     onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['payment_allocations'] })
-       queryClient.invalidateQueries({ queryKey: ['expense_payments'] })
-       queryClient.invalidateQueries({ queryKey: ['expenses'] })
+       queryClient.invalidateQueries({ queryKey: ['expense_payments', orgId] })
+       queryClient.invalidateQueries({ queryKey: ['expenses', orgId] })
        toast.success('Link removed successfully')
     },
     onError: (error: Error) => {

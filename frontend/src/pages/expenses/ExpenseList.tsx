@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search, Link as LinkIcon, ChevronRight, MoreVertical } from 'lucide-react'
+import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useState, useMemo } from 'react'
+import { Plus, Pencil, Trash2, Search, ChevronRight, MoreVertical } from 'lucide-react'
 import { useExpenses, useDeleteExpense, useUpdateExpense } from '@/hooks/useExpenses'
 import { useExpensePayments, useDeleteExpensePayment, useUpdateExpensePayment } from '@/hooks/useExpensePayments'
 import { Button } from '@/components/ui/button'
@@ -41,10 +41,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ExpenseStatusBadge } from '@/components/expenses/ExpenseStatusBadge'
+import { Wallet, ReceiptText, CircleDollarSign } from 'lucide-react'
 
 export default function ExpenseList() {
   const { orgSlug } = useParams()
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
+  const [outstandingOnly, setOutstandingOnly] = useState(false)
+  const [unusedOnly, setUnusedOnly] = useState(false)
+  const [activeTab, setActiveTab] = useState('expenses')
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [editingPayment, setEditingPayment] = useState<ExpensePayment | null>(null)
   const [allocatingPayment, setAllocatingPayment] = useState<ExpensePayment | null>(null)
@@ -66,19 +72,78 @@ export default function ExpenseList() {
       record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.project?.project_id_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.vendor?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.category?.toLowerCase().includes(searchQuery.toLowerCase())
+      record.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.expense_number?.toLowerCase().includes(searchQuery.toLowerCase())
     
-    return searchMatch
+    if (!searchMatch) return false
+    
+    if (outstandingOnly) {
+      const allocated = record.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
+      return allocated < record.total_paid - 0.1
+    }
+
+    return true
   })
 
-  const filteredPayments = payments?.filter((record) => {
-    const searchMatch = 
-      record.vendor?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.project?.project_id_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.bank_account?.account_name.toLowerCase().includes(searchQuery.toLowerCase())
+  const unifiedPayments = useMemo(() => {
+    const ep = payments?.map(p => ({
+      id: p.id,
+      date: p.date,
+      vendor: p.vendor,
+      amount: p.amount,
+      payment_number: p.payment_number,
+      bank_account: p.bank_account,
+      notes: p.notes,
+      type: 'payment' as const,
+      allocations: p.allocations,
+      raw: p
+    })) || []
     
-    return searchMatch
-  })
+    const dp = expenses?.filter(e => e.bank_account_id).map(e => ({
+      id: e.id,
+      date: e.date,
+      vendor: e.vendor,
+      amount: e.total_paid,
+      payment_number: e.expense_number,
+      bank_account: e.bank_account,
+      notes: e.notes,
+      type: 'expense' as const,
+      allocations: [],
+      raw: e
+    })) || []
+    
+    const combined = [...ep, ...dp].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    
+    return combined.filter(p => {
+      const searchMatch = !searchQuery || 
+        p.vendor?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.payment_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.bank_account?.account_name.toLowerCase().includes(searchQuery.toLowerCase())
+      
+      if (!searchMatch) return false
+
+      if (unusedOnly) {
+        if (p.type === 'expense') return false // Direct expenses are always "used"
+        const used = p.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
+        return p.amount - used > 0.1
+      }
+
+      return true
+    })
+  }, [payments, expenses, searchQuery, unusedOnly])
+
+  const vendorAdvances = useMemo(() => {
+    const advances: Record<string, number> = {}
+    payments?.forEach(p => {
+      if (!p.vendor_id) return
+      const used = p.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
+      const unused = p.amount - used
+      if (unused > 0.1) {
+        advances[p.vendor_id] = (advances[p.vendor_id] || 0) + unused
+      }
+    })
+    return advances
+  }, [payments])
 
   const handleDeleteExpense = (id: string) => {
     deleteExpense.mutate(id)
@@ -103,27 +168,6 @@ export default function ExpenseList() {
     setPayingBill(null)
   }
 
-  const getStatusBadge = (record: Expense) => {
-     if (record.bank_account_id) {
-        return <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">Paid</Badge>
-     }
-     
-     const allocatedAmount = record.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
-     
-     if (allocatedAmount >= record.total_paid - 0.1) { // Floating point tolerance
-        return <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200 whitespace-nowrap">Paid</Badge>
-     }
-
-     if (allocatedAmount > 0) {
-        const pending = record.total_paid - allocatedAmount
-        return <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-200 border-orange-200 whitespace-nowrap">
-           Partial (₹{pending.toLocaleString('en-IN')})
-        </Badge>
-     }
-
-     return <Badge variant="destructive" className="whitespace-nowrap">Unpaid</Badge>
-  }
-
   const isLoading = isLoadingExpenses || isLoadingPayments
 
   if (isLoading) {
@@ -138,9 +182,9 @@ export default function ExpenseList() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Expenses & Payments</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Expenses & Bills</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your bills and vendor payments
+            Track what you owe and settlements you've made
           </p>
         </div>
         <div className="flex gap-2">
@@ -157,24 +201,51 @@ export default function ExpenseList() {
         </div>
       </div>
 
-      <ExpenseStatsCards expenses={expenses} payments={payments} />
+      <ExpenseStatsCards 
+        expenses={expenses} 
+        payments={payments} 
+        onOutstandingClick={() => {
+          if (outstandingOnly) {
+            setOutstandingOnly(false)
+          } else {
+            setActiveTab('expenses')
+            setOutstandingOnly(true)
+          }
+        }}
+        onUnusedAdvancesClick={() => {
+          if (unusedOnly) {
+            setUnusedOnly(false)
+          } else {
+            setActiveTab('payments')
+            setUnusedOnly(true)
+          }
+        }}
+        isActiveOutstanding={outstandingOnly}
+        isActiveUnused={unusedOnly}
+      />
 
-      <div className="flex flex-col sm:flex-row gap-4 items-center">
+      <div className="flex flex-col md:flex-row gap-4 items-center">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search..."
+            placeholder="Search bills, vendors, bank accounts..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-11"
           />
         </div>
       </div>
 
-      <Tabs defaultValue="expenses" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-          <TabsTrigger value="expenses">Bills & Expenses</TabsTrigger>
-          <TabsTrigger value="payments">Vendor Payments</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 lg:w-[450px]">
+          <TabsTrigger value="expenses" className="gap-2">
+            <ReceiptText className="h-4 w-4" />
+            Bills
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="gap-2">
+            <Wallet className="h-4 w-4" />
+            Payments
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="expenses" className="mt-4 space-y-4">
@@ -237,18 +308,26 @@ export default function ExpenseList() {
                                 ₹{record.total_paid.toLocaleString('en-IN')}
                               </TableCell>
                               <TableCell>
-                                 <div className="flex items-center gap-1">
-                                    {getStatusBadge(record)}
-                                    {(record.allocations?.length || 0) > 0 && (
-                                       <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          className="h-7 w-7 text-muted-foreground hover:text-primary transition-colors"
-                                          onClick={() => setViewingAllocation({ type: 'expense', record })}
-                                          title="View Links"
-                                       >
-                                          <ChevronRight className="w-4 h-4" />
-                                       </Button>
+                                 <div className="flex flex-col gap-1">
+                                    <ExpenseStatusBadge 
+                                      record={record} 
+                                      onPay={() => {
+                                        setPayingBill({
+                                          id: record.id,
+                                          expense_number: record.expense_number,
+                                          vendor_id: record.vendor_id!,
+                                          project_id: record.project_id,
+                                          amount: record.total_paid - allocated
+                                        })
+                                        setIsPaymentModalOpen(true)
+                                      }}
+                                      onViewLinks={() => setViewingAllocation({ type: 'expense', record })}
+                                    />
+                                    {record.vendor_id && vendorAdvances[record.vendor_id] > 0.1 && (
+                                      <div className="text-[10px] bg-primary/5 text-primary border border-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-1 font-bold animate-pulse whitespace-nowrap mt-0.5 w-fit">
+                                        <CircleDollarSign className="w-2.5 h-2.5" />
+                                        ₹{vendorAdvances[record.vendor_id].toLocaleString('en-IN')} CR
+                                      </div>
                                     )}
                                  </div>
                               </TableCell>
@@ -364,11 +443,37 @@ export default function ExpenseList() {
                   },
                   {
                     label: 'Status',
-                    value: getStatusBadge(record)
+                    value: (
+                      <ExpenseStatusBadge 
+                        record={record} 
+                        onPay={() => {
+                          const allocated = record.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
+                          setPayingBill({
+                            id: record.id,
+                            expense_number: record.expense_number,
+                            vendor_id: record.vendor_id!,
+                            project_id: record.project_id,
+                            amount: record.total_paid - allocated
+                          })
+                          setIsPaymentModalOpen(true)
+                        }}
+                        onViewLinks={() => setViewingAllocation({ type: 'expense', record })}
+                        className="text-xs"
+                      />
+                    )
                   },
                   {
                     label: 'Vendor',
-                    value: record.vendor?.name || '—'
+                    value: (
+                      <div className="flex items-center gap-2">
+                        {record.vendor?.name || '—'}
+                          {record.vendor_id && vendorAdvances[record.vendor_id] > 0.1 && (
+                            <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full font-bold animate-pulse whitespace-nowrap">
+                              ₹{vendorAdvances[record.vendor_id].toLocaleString('en-IN')} CR
+                            </span>
+                          )}
+                      </div>
+                    )
                   },
                   {
                     label: 'Links',
@@ -434,31 +539,36 @@ export default function ExpenseList() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[180px]">Payment & Bank</TableHead>
+                      <TableHead className="w-[180px]">Reference & Mode</TableHead>
                       <TableHead className="w-[120px]">Date</TableHead>
                       <TableHead>Vendor</TableHead>
-                      <TableHead className="w-[120px]">Amount</TableHead>
-                      <TableHead className="w-[140px]">Status</TableHead>
-                      <TableHead className="text-right w-[100px]">Actions</TableHead>
+                      <TableHead className="w-[125px] text-right">Amount</TableHead>
+                      <TableHead className="w-[140px]">Links</TableHead>
+                      <TableHead className="text-right w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredPayments?.length === 0 ? (
+                    {unifiedPayments.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No payments found.
+                          No transaction history found.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredPayments?.map((record) => {
+                      unifiedPayments.map((record) => {
                           const usedAmount = record.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
                           const unusedAmount = record.amount - usedAmount
                           
                           return (
-                            <TableRow key={record.id} className="group hover:bg-muted/30 transition-colors">
+                            <TableRow key={`${record.type}-${record.id}`} className="group hover:bg-muted/30 transition-colors">
                                <TableCell>
                                  <div className="flex flex-col">
-                                   <span className="font-mono text-[10px] text-muted-foreground">{record.payment_number || '-'}</span>
+                                   <div className="flex items-center gap-2">
+                                     <span className="font-mono text-[10px] text-muted-foreground">{record.payment_number || '-'}</span>
+                                     {record.type === 'expense' && (
+                                       <Badge variant="outline" className="text-[9px] h-4 px-1 leading-none uppercase bg-blue-50 text-blue-600 border-blue-200">Direct</Badge>
+                                     )}
+                                   </div>
                                    <span className="text-xs font-semibold text-primary truncate max-w-[160px]" title={record.bank_account?.account_name}>
                                      {record.bank_account?.account_name || 'Generic Payment'}
                                    </span>
@@ -470,46 +580,47 @@ export default function ExpenseList() {
                                <TableCell>
                                  <span className="text-sm font-medium">{record.vendor?.name || 'Unknown Vendor'}</span>
                                </TableCell>
-                               <TableCell className="font-bold text-red-600/80">
+                               <TableCell className="text-right font-bold text-red-600/80">
                                  ₹{record.amount.toLocaleString('en-IN')}
                                </TableCell>
                                <TableCell>
                                  <div className="flex items-center gap-1">
-                                   {unusedAmount > 0.1 ? (
-                                      <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-200 border-orange-200 text-xs py-0.5 px-2.5 whitespace-nowrap">
-                                        ₹{unusedAmount.toLocaleString('en-IN')} Unused
+                                   {record.type === 'expense' ? (
+                                      <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-[10px] py-0 px-2 leading-5 h-5 whitespace-nowrap">
+                                        Settled (Direct)
                                       </Badge>
                                    ) : (
-                                      <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200 text-xs py-0.5 px-2.5 whitespace-nowrap">
-                                        Fully Used
-                                      </Badge>
-                                   )}
-                                   {(record.allocations?.length || 0) > 0 && (
-                                     <Button 
-                                       variant="ghost" 
-                                       size="icon" 
-                                       onClick={() => setViewingAllocation({ type: 'payment', record })}
-                                       className="h-7 w-7 text-muted-foreground hover:text-primary transition-colors"
-                                       title="View Links"
-                                     >
-                                        <ChevronRight className="w-4 h-4" />
-                                     </Button>
+                                       <>
+                                         {unusedAmount > 0.1 ? (
+                                            <Badge 
+                                              variant="secondary" 
+                                              className="bg-orange-100 text-orange-800 border-orange-200 text-[10px] py-0 px-2 leading-5 h-5 whitespace-nowrap cursor-pointer hover:bg-orange-200"
+                                              onClick={() => handleAllocatePayment(record.raw as ExpensePayment)}
+                                            >
+                                              ₹{unusedAmount.toLocaleString('en-IN')} Unused
+                                            </Badge>
+                                         ) : (
+                                            <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-[10px] py-0 px-2 leading-5 h-5 whitespace-nowrap">
+                                              Fully Used
+                                            </Badge>
+                                         )}
+                                         {(record.allocations?.length || 0) > 0 && (
+                                           <Button 
+                                             variant="ghost" 
+                                             size="icon" 
+                                             onClick={() => setViewingAllocation({ type: 'payment', record: record.raw as ExpensePayment })}
+                                             className="h-7 w-7 text-muted-foreground hover:text-primary transition-colors"
+                                             title="View Links"
+                                           >
+                                              <ChevronRight className="w-4 h-4" />
+                                           </Button>
+                                         )}
+                                       </>
                                    )}
                                  </div>
                                </TableCell>
                                <TableCell className="text-right">
                                  <div className="flex justify-end items-center gap-1">
-                                     {unusedAmount > 0.1 && (
-                                        <Button 
-                                          variant="outline" 
-                                          size="sm" 
-                                          onClick={() => handleAllocatePayment(record)}
-                                          className="h-8 px-3 text-primary border-primary/20 hover:bg-primary/5 font-bold transition-all"
-                                        >
-                                           Link
-                                        </Button>
-                                     )}
-                                   
                                    <DropdownMenu>
                                      <DropdownMenuTrigger asChild>
                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
@@ -517,25 +628,35 @@ export default function ExpenseList() {
                                        </Button>
                                      </DropdownMenuTrigger>
                                      <DropdownMenuContent align="end" className="w-40">
-                                       <DropdownMenuItem onClick={() => handleEditPayment(record)} className="flex items-center gap-2 cursor-pointer">
-                                         <Pencil className="h-3.5 w-3.5" /> Edit
-                                       </DropdownMenuItem>
-                                       <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                         <div className="-mx-2 -my-1.5 w-[calc(100%+1rem)] py-1.5 px-2 flex items-center gap-2 whitespace-nowrap">
-                                           <NotesManager
-                                             notes={record.notes}
-                                             onUpdate={async (newNotes: Note[]) => {
-                                               await updatePayment.mutateAsync({
-                                                 id: record.id,
-                                                 input: { notes: newNotes }
-                                               })
-                                             }}
-                                             title={`Notes for Payment to ${record.vendor?.name}`}
-                                             entityName={`Payment to ${record.vendor?.name}`}
-                                           />
-                                           <span className="text-sm">Notes</span>
-                                         </div>
-                                       </DropdownMenuItem>
+                                       {record.type === 'payment' ? (
+                                         <>
+                                           <DropdownMenuItem onClick={() => handleEditPayment(record.raw as ExpensePayment)} className="flex items-center gap-2 cursor-pointer">
+                                             <Pencil className="h-3.5 w-3.5" /> Edit
+                                           </DropdownMenuItem>
+                                           <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                             <div className="-mx-2 -my-1.5 w-[calc(100%+1rem)] py-1.5 px-2 flex items-center gap-2 whitespace-nowrap">
+                                               <NotesManager
+                                                 notes={record.notes}
+                                                 onUpdate={async (newNotes: Note[]) => {
+                                                   await updatePayment.mutateAsync({
+                                                     id: record.id,
+                                                     input: { notes: newNotes }
+                                                   })
+                                                 }}
+                                                 title={`Notes for Payment`}
+                                                 entityName={`Payment`}
+                                               />
+                                               <span className="text-sm">Notes</span>
+                                             </div>
+                                           </DropdownMenuItem>
+                                         </>
+                                       ) : (
+                                         <DropdownMenuItem asChild>
+                                           <Link to={`/${orgSlug}/expenses/${record.id}/edit`} className="flex items-center gap-2 cursor-pointer">
+                                             <Pencil className="h-3.5 w-3.5" /> Edit Expense
+                                           </Link>
+                                         </DropdownMenuItem>
+                                       )}
                                        <AlertDialog>
                                          <AlertDialogTrigger asChild>
                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive flex items-center gap-2 cursor-pointer font-medium">
@@ -544,15 +665,15 @@ export default function ExpenseList() {
                                          </AlertDialogTrigger>
                                          <AlertDialogContent>
                                            <AlertDialogHeader>
-                                             <AlertDialogTitle>Delete Payment</AlertDialogTitle>
+                                             <AlertDialogTitle>Delete {record.type === 'payment' ? 'Payment' : 'Expense'}</AlertDialogTitle>
                                              <AlertDialogDescription>
-                                               Are you sure you want to delete this payment of ₹{record.amount.toLocaleString('en-IN')}?
+                                               Are you sure you want to delete this {record.type} of ₹{record.amount.toLocaleString('en-IN')}?
                                              </AlertDialogDescription>
                                            </AlertDialogHeader>
                                            <AlertDialogFooter>
                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
                                              <AlertDialogAction
-                                               onClick={() => handleDeletePayment(record.id)}
+                                               onClick={() => record.type === 'payment' ? handleDeletePayment(record.id) : handleDeleteExpense(record.id)}
                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                              >
                                                Delete
@@ -575,16 +696,21 @@ export default function ExpenseList() {
           </div>
 
           <div className="md:hidden space-y-4">
-             {filteredPayments?.map((record) => {
+             {unifiedPayments.map((record) => {
                  const usedAmount = record.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
                  const unusedAmount = record.amount - usedAmount
                  
                  return (
                     <MobileTransactionCard
-                       key={record.id}
+                       key={`${record.type}-${record.id}`}
                        title={format(new Date(record.date), 'dd MMM yyyy')}
-                       badge={<Badge variant="outline">Payment</Badge>}
+                       badge={
+                         <div className="flex gap-2">
+                           <Badge variant="outline">{record.type === 'expense' ? 'Direct' : 'Payment'}</Badge>
+                         </div>
+                       }
                        fields={[
+                          { label: 'Reference', value: record.payment_number || '—' },
                           { label: 'Vendor', value: record.vendor?.name || 'Unknown' },
                           { label: 'Bank', value: record.bank_account?.account_name || '—' },
                           { 
@@ -593,48 +719,37 @@ export default function ExpenseList() {
                              className: 'text-red-600 font-bold' 
                           },
                           {
-                             label: 'Unused',
-                             value: unusedAmount > 0.1 ? `₹${unusedAmount.toLocaleString('en-IN')}` : 'Fully Used',
-                             className: unusedAmount > 0.1 ? 'text-orange-600' : 'text-green-600'
-                          },
-                          {
-                             label: 'Links',
-                             value: (record.allocations?.length || 0) > 0 ? (
-                               <Button 
-                                 variant="ghost" 
-                                 size="icon" 
-                                 className="h-6 w-6 text-muted-foreground"
-                                 onClick={() => setViewingAllocation({ type: 'payment', record })}
-                               >
-                                 <ChevronRight className="h-4 w-4" />
-                               </Button>
-                             ) : '—'
+                             label: 'Status',
+                             value: record.type === 'expense' ? (
+                               <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">Settled</Badge>
+                             ) : (
+                               unusedAmount > 0.1 ? (
+                                 <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
+                                   ₹{unusedAmount.toLocaleString('en-IN')} Unused
+                                 </Badge>
+                               ) : (
+                                 <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">Fully Used</Badge>
+                               )
+                             )
                           }
                        ]}
                        notesProps={{
                           notes: record.notes,
                           onUpdate: async (newNotes) => {
-                             await updatePayment.mutateAsync({
-                                id: record.id,
-                                input: { notes: newNotes }
-                             })
+                             if (record.type === 'payment') {
+                               await updatePayment.mutateAsync({ id: record.id, input: { notes: newNotes } })
+                             } else {
+                               await updateExpense.mutateAsync({ id: record.id, input: { notes: newNotes } })
+                             }
                           },
-                          title: `Notes for Payment`,
-                          entityName: `Payment`
+                          title: `Notes for ${record.type}`,
+                          entityName: record.type
                        }}
-                       onEdit={() => handleEditPayment(record)}
-                       onDelete={() => handleDeletePayment(record.id)}
-                       deleteTitle="Delete Payment"
-                       deleteDescription={`Are you sure you want to delete this payment of ₹${record.amount.toLocaleString('en-IN')}?`}
-                    >
-                       {unusedAmount > 0.1 && (
-                          <div className="mt-2 border-t pt-2 w-full">
-                             <Button variant="outline" size="sm" className="w-full" onClick={() => handleAllocatePayment(record)}>
-                                <LinkIcon className="w-3 h-3 mr-2" /> Link to Bill
-                             </Button>
-                          </div>
-                       )}
-                    </MobileTransactionCard>
+                       onEdit={() => record.type === 'payment' ? handleEditPayment(record.raw as ExpensePayment) : navigate(`/${orgSlug}/expenses/${record.id}/edit`)}
+                       onDelete={() => record.type === 'payment' ? handleDeletePayment(record.id) : handleDeleteExpense(record.id)}
+                       deleteTitle={`Delete ${record.type}`}
+                       deleteDescription={`Are you sure?`}
+                    />
                  )
              })}
           </div>

@@ -281,47 +281,47 @@ const GSTSummary: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-green-600 dark:text-green-400">Total Output Tax (Sales)</CardTitle>
+          <CardHeader className="pb-1 pt-3 px-4">
+            <CardTitle className="text-[11px] uppercase tracking-wider font-semibold text-green-600 dark:text-green-400">Total Output Tax (Sales)</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totals.outputTax.toLocaleString('en-IN')}</div>
+          <CardContent className="pb-3 px-4">
+            <div className="text-xl font-bold">₹{totals.outputTax.toLocaleString('en-IN')}</div>
           </CardContent>
         </Card>
         <Card className="bg-red-50/50 dark:bg-red-950/20 border-red-100 dark:border-red-900">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-600 dark:text-red-400">Total Input Tax (Expenses)</CardTitle>
+          <CardHeader className="pb-1 pt-3 px-4">
+            <CardTitle className="text-[11px] uppercase tracking-wider font-semibold text-red-600 dark:text-red-400">Total Input Tax (Expenses)</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totals.inputTax.toLocaleString('en-IN')}</div>
+          <CardContent className="pb-3 px-4">
+            <div className="text-xl font-bold">₹{totals.inputTax.toLocaleString('en-IN')}</div>
           </CardContent>
         </Card>
         <Card className={cn(
           "border-primary/20",
           totals.netGST > 0 ? "bg-amber-50/50 dark:bg-amber-950/20" : "bg-slate-50/50 dark:bg-slate-900/50"
         )}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Net GST Liability</CardTitle>
+          <CardHeader className="pb-1 pt-3 px-4">
+            <CardTitle className="text-[11px] uppercase tracking-wider font-semibold">Net GST Liability</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totals.netGST.toLocaleString('en-IN')}</div>
+          <CardContent className="pb-3 px-4">
+            <div className="text-xl font-bold">₹{totals.netGST.toLocaleString('en-IN')}</div>
           </CardContent>
         </Card>
         <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-400">Total GST Paid (Settled)</CardTitle>
+          <CardHeader className="pb-1 pt-3 px-4">
+            <CardTitle className="text-[11px] uppercase tracking-wider font-semibold text-blue-600 dark:text-blue-400">Total GST Paid (Settled)</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totals.paidGST.toLocaleString('en-IN')}</div>
+          <CardContent className="pb-3 px-4">
+            <div className="text-xl font-bold">₹{totals.paidGST.toLocaleString('en-IN')}</div>
           </CardContent>
         </Card>
         <Card className={cn(
-          "md:col-span-3 border-2",
+          "md:col-span-2 lg:col-span-4 border-2",
           totals.balancePayable > 0.1 ? "bg-primary/5 border-primary/20 shadow-md" : "bg-green-50/50 border-green-200"
         )}>
-          <CardHeader className="py-3">
+          <CardHeader className="py-2 px-4">
             <CardTitle className="text-base font-black flex items-center justify-between">
               Balance Payable to Dept
               <Badge variant={totals.balancePayable > 0.1 ? "default" : "secondary"} className="font-bold">

@@ -1,20 +1,29 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { TrendingUp, Wallet, Clock } from "lucide-react"
 import type { Expense, ExpensePayment } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 interface ExpenseStatsCardsProps {
   expenses: Expense[] | undefined
   payments: ExpensePayment[] | undefined
+  onOutstandingClick?: () => void
+  onUnusedAdvancesClick?: () => void
+  isActiveOutstanding?: boolean
+  isActiveUnused?: boolean
 }
 
-export function ExpenseStatsCards({ expenses, payments }: ExpenseStatsCardsProps) {
-  // Calculate stats
+export function ExpenseStatsCards({ 
+  expenses, 
+  payments, 
+  onOutstandingClick, 
+  onUnusedAdvancesClick,
+  isActiveOutstanding,
+  isActiveUnused
+}: ExpenseStatsCardsProps) {
+  // ... existing calculation logic ...
   const totalOutstanding = expenses?.reduce((sum, exp) => {
-    // If it's a direct payment (has bank_account_id), it's fully paid
     if (exp.bank_account_id) return sum
-
     const allocated = exp.allocations?.reduce((aSum, a) => aSum + a.amount, 0) || 0
-    // Only include unpaid or partially paid
     if (allocated < exp.total_paid - 0.1) {
       return sum + (exp.total_paid - allocated)
     }
@@ -42,6 +51,8 @@ export function ExpenseStatsCards({ expenses, payments }: ExpenseStatsCardsProps
       icon: Clock,
       color: "text-orange-600",
       bgColor: "bg-orange-50",
+      onClick: onOutstandingClick,
+      isActive: isActiveOutstanding,
     },
     {
       label: "Expenses (This Month)",
@@ -56,16 +67,26 @@ export function ExpenseStatsCards({ expenses, payments }: ExpenseStatsCardsProps
       icon: Wallet,
       color: "text-green-600",
       bgColor: "bg-green-50",
+      onClick: onUnusedAdvancesClick,
+      isActive: isActiveUnused,
     },
   ]
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {stats.map((stat) => (
-        <Card key={stat.label}>
+        <Card 
+          key={stat.label} 
+          className={cn(
+            "transition-all duration-200 border-2",
+            stat.onClick ? "cursor-pointer hover:border-primary/30" : "cursor-default",
+            stat.isActive ? "border-primary bg-primary/[0.02] ring-1 ring-primary/20 shadow-md" : "border-transparent"
+          )}
+          onClick={stat.onClick}
+        >
           <CardContent className="p-4 flex items-center gap-4">
-            <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-              <stat.icon className={`h-5 w-5 ${stat.color}`} />
+            <div className={cn("p-2 rounded-lg transition-colors", stat.isActive ? "bg-primary text-white" : stat.bgColor)}>
+              <stat.icon className={cn("h-5 w-5", stat.isActive ? "text-white" : stat.color)} />
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
