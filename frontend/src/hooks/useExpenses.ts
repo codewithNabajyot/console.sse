@@ -16,7 +16,7 @@ export function useExpenses(includeDeleted = false) {
       
       let query = supabase
         .from('expenses')
-        .select('*, project:projects(*, customer:customers(*)), vendor:vendors(*), bank_account:bank_accounts(*)')
+        .select('*, project:projects(*, customer:customers(*)), vendor:vendors(*), bank_account:bank_accounts(*), allocations:payment_allocations(*, payment:expense_payments(*, vendor:vendors(*)))')
         .eq('org_id', orgId)
       
       if (!includeDeleted) {

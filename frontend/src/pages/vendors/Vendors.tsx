@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, BookOpen } from 'lucide-react'
 import { useVendors, useDeleteVendor, useUpdateVendor } from '@/hooks/useVendors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -107,7 +107,17 @@ export default function Vendors() {
                       <TableCell>{vendor.category || '—'}</TableCell>
                       <TableCell>{vendor.gst_number || '—'}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2 text-primary">
+                        <div className="flex justify-end gap-2 text-primary items-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Vendor Ledger"
+                            asChild
+                          >
+                            <Link to={`/${orgSlug}/vendors/${vendor.id}/ledger`}>
+                              <BookOpen className="h-4 w-4" />
+                            </Link>
+                          </Button>
                           <NotesManager
                             notes={vendor.notes}
                             onUpdate={async (newNotes: Note[], message: string) => {
@@ -179,6 +189,11 @@ export default function Vendors() {
                 <CardTitle className="text-lg flex items-center justify-between">
                   <span>{vendor.name}</span>
                   <div className="flex gap-1 items-center">
+                    <Button variant="ghost" size="icon" asChild>
+                      <Link to={`/${orgSlug}/vendors/${vendor.id}/ledger`}>
+                        <BookOpen className="h-4 w-4" />
+                      </Link>
+                    </Button>
                     <NotesManager
                       notes={vendor.notes}
                       onUpdate={async (newNotes: Note[], message: string) => {
@@ -241,6 +256,7 @@ export default function Vendors() {
           ))
         )}
       </div>
+
     </div>
   )
 }

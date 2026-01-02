@@ -11,15 +11,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import { format, startOfMonth, endOfMonth, isWithinInterval, addMonths, parseISO } from 'date-fns'
 import { cn } from '@/lib/utils'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Loader2, Plus } from 'lucide-react'
 import { utils, writeFile } from 'xlsx'
+import { Button } from '@/components/ui/button'
+import { Link, useParams } from 'react-router-dom'
 
 const GSTSummary: React.FC = () => {
   const { data: invoices, isLoading: isLoadingInvoices } = useInvoices()
   const { data: expenses, isLoading: isLoadingExpenses } = useExpenses()
   const { data: income, isLoading: isLoadingIncome } = useIncome()
+  const { orgSlug } = useParams()
   const [isExporting, setIsExporting] = useState(false)
   
   // Financial Year Selection
@@ -65,18 +69,27 @@ const GSTSummary: React.FC = () => {
 
       const monthExpenses = expenses.filter(exp => {
         const date = new Date(exp.date)
-        return isWithinInterval(date, { start: month.start, end: month.end })
+        return isWithinInterval(date, { start: month.start, end: month.end }) && !exp.category?.startsWith('STATUTORY')
+      })
+
+      const monthPayments = expenses.filter(exp => {
+        const date = new Date(exp.date)
+        return isWithinInterval(date, { start: month.start, end: month.end }) && exp.category === 'STATUTORY_GST_PAYMENT'
       })
 
       const outputTax = monthInvoices.reduce((sum, inv) => sum + (inv.gst_amount || 0), 0)
       const inputTax = monthExpenses.reduce((sum, exp) => sum + (exp.gst_amount || 0), 0)
       const netGST = outputTax - inputTax
+      const paidGST = monthPayments.reduce((sum, exp) => sum + (exp.total_paid || 0), 0)
+      const balancePayable = netGST - paidGST
 
       return {
         month: month.name,
         outputTax,
         inputTax,
         netGST,
+        paidGST,
+        balancePayable
       }
     })
   }, [months, invoices, expenses])
@@ -85,8 +98,10 @@ const GSTSummary: React.FC = () => {
     return stats.reduce((acc, curr) => ({
       outputTax: acc.outputTax + curr.outputTax,
       inputTax: acc.inputTax + curr.inputTax,
-      netGST: acc.netGST + curr.netGST
-    }), { outputTax: 0, inputTax: 0, netGST: 0 })
+      netGST: acc.netGST + curr.netGST,
+      paidGST: acc.paidGST + (curr.paidGST || 0),
+      balancePayable: acc.balancePayable + (curr.balancePayable || 0)
+    }), { outputTax: 0, inputTax: 0, netGST: 0, paidGST: 0, balancePayable: 0 })
   }, [stats])
 
   const handleCAExport = async () => {
@@ -236,6 +251,12 @@ const GSTSummary: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <Link to={`/${orgSlug}/expenses/new?category=STATUTORY_GST_PAYMENT`}>
+            <Button variant="outline" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Record GST Payment
+            </Button>
+          </Link>
           <button
             onClick={handleCAExport}
             disabled={isExporting}
@@ -260,32 +281,59 @@ const GSTSummary: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-green-600 dark:text-green-400">Total Output Tax (Sales)</CardTitle>
+          <CardHeader className="pb-1 pt-3 px-4">
+            <CardTitle className="text-[11px] uppercase tracking-wider font-semibold text-green-600 dark:text-green-400">Total Output Tax (Sales)</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totals.outputTax.toLocaleString('en-IN')}</div>
+          <CardContent className="pb-3 px-4">
+            <div className="text-xl font-bold">₹{totals.outputTax.toLocaleString('en-IN')}</div>
           </CardContent>
         </Card>
         <Card className="bg-red-50/50 dark:bg-red-950/20 border-red-100 dark:border-red-900">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-600 dark:text-red-400">Total Input Tax (Expenses)</CardTitle>
+          <CardHeader className="pb-1 pt-3 px-4">
+            <CardTitle className="text-[11px] uppercase tracking-wider font-semibold text-red-600 dark:text-red-400">Total Input Tax (Expenses)</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totals.inputTax.toLocaleString('en-IN')}</div>
+          <CardContent className="pb-3 px-4">
+            <div className="text-xl font-bold">₹{totals.inputTax.toLocaleString('en-IN')}</div>
           </CardContent>
         </Card>
         <Card className={cn(
           "border-primary/20",
-          totals.netGST > 0 ? "bg-blue-50/50 dark:bg-blue-950/20" : "bg-slate-50/50 dark:bg-slate-900/50"
+          totals.netGST > 0 ? "bg-amber-50/50 dark:bg-amber-950/20" : "bg-slate-50/50 dark:bg-slate-900/50"
         )}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Net GST Payable</CardTitle>
+          <CardHeader className="pb-1 pt-3 px-4">
+            <CardTitle className="text-[11px] uppercase tracking-wider font-semibold">Net GST Liability</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totals.netGST.toLocaleString('en-IN')}</div>
+          <CardContent className="pb-3 px-4">
+            <div className="text-xl font-bold">₹{totals.netGST.toLocaleString('en-IN')}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900">
+          <CardHeader className="pb-1 pt-3 px-4">
+            <CardTitle className="text-[11px] uppercase tracking-wider font-semibold text-blue-600 dark:text-blue-400">Total GST Paid (Settled)</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-3 px-4">
+            <div className="text-xl font-bold">₹{totals.paidGST.toLocaleString('en-IN')}</div>
+          </CardContent>
+        </Card>
+        <Card className={cn(
+          "md:col-span-2 lg:col-span-4 border-2",
+          totals.balancePayable > 0.1 ? "bg-primary/5 border-primary/20 shadow-md" : "bg-green-50/50 border-green-200"
+        )}>
+          <CardHeader className="py-2 px-4">
+            <CardTitle className="text-base font-black flex items-center justify-between">
+              Balance Payable to Dept
+              <Badge variant={totals.balancePayable > 0.1 ? "default" : "secondary"} className="font-bold">
+                {totals.balancePayable > 0.1 ? "PAYMENT DUE" : "CLEARED"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <div className={cn("text-3xl font-black", totals.balancePayable > 0.1 ? "text-primary" : "text-green-700")}>
+              ₹{Math.abs(totals.balancePayable).toLocaleString('en-IN')}
+              {totals.balancePayable < -0.1 && <span className="text-sm ml-2 font-bold">(Excess Paid)</span>}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -299,20 +347,24 @@ const GSTSummary: React.FC = () => {
                   <TableHead>Month</TableHead>
                   <TableHead className="text-right">Output Tax (Sales)</TableHead>
                   <TableHead className="text-right">Input Tax (Expenses)</TableHead>
-                  <TableHead className="text-right">Net GST Payable</TableHead>
+                  <TableHead className="text-right">Net Liability</TableHead>
+                  <TableHead className="text-right">Paid</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {stats.map((row) => (
-                  <TableRow key={row.month} className={row.netGST === 0 && row.outputTax === 0 && row.inputTax === 0 ? "opacity-40" : ""}>
+                  <TableRow key={row.month} className={row.netGST === 0 && row.outputTax === 0 && row.inputTax === 0 && row.paidGST === 0 ? "opacity-40" : ""}>
                     <TableCell className="font-medium">{row.month}</TableCell>
-                    <TableCell className="text-right">₹{row.outputTax.toLocaleString('en-IN')}</TableCell>
-                    <TableCell className="text-right text-red-600 dark:text-red-400">₹{row.inputTax.toLocaleString('en-IN')}</TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm">₹{row.outputTax.toLocaleString('en-IN')}</TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm text-red-600 dark:text-red-400">₹{row.inputTax.toLocaleString('en-IN')}</TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm font-bold">₹{row.netGST.toLocaleString('en-IN')}</TableCell>
+                    <TableCell className="text-right text-xs sm:text-sm text-blue-600 font-bold">₹{(row.paidGST || 0).toLocaleString('en-IN')}</TableCell>
                     <TableCell className={cn(
-                      "text-right font-bold",
-                      row.netGST > 0 ? "text-primary" : row.netGST < 0 ? "text-green-600" : ""
+                      "text-right font-black",
+                      row.balancePayable > 0.1 ? "text-primary" : row.balancePayable < -0.1 ? "text-green-600" : ""
                     )}>
-                      ₹{row.netGST.toLocaleString('en-IN')}
+                      ₹{row.balancePayable.toLocaleString('en-IN')}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -320,11 +372,13 @@ const GSTSummary: React.FC = () => {
                   <TableCell>Total</TableCell>
                   <TableCell className="text-right">₹{totals.outputTax.toLocaleString('en-IN')}</TableCell>
                   <TableCell className="text-right text-red-600 dark:text-red-400">₹{totals.inputTax.toLocaleString('en-IN')}</TableCell>
+                  <TableCell className="text-right">₹{totals.netGST.toLocaleString('en-IN')}</TableCell>
+                  <TableCell className="text-right text-blue-600">₹{totals.paidGST.toLocaleString('en-IN')}</TableCell>
                   <TableCell className={cn(
-                    "text-right",
-                    totals.netGST > 0 ? "text-primary" : "text-green-600"
+                    "text-right font-black text-lg",
+                    totals.balancePayable > 0.1 ? "text-primary" : "text-green-600"
                   )}>
-                    ₹{totals.netGST.toLocaleString('en-IN')}
+                    ₹{totals.balancePayable.toLocaleString('en-IN')}
                   </TableCell>
                 </TableRow>
               </TableBody>

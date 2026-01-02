@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search, Eye, ChevronRight } from 'lucide-react'
+import { Plus, Search, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { useInvoices, useDeleteInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
-import { InvoiceViewModal } from '@/components/InvoiceViewModal'
-import { PaymentHistoryModal } from '@/components/PaymentHistoryModal'
+import { useIncome } from '@/hooks/useIncome'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { NotesManager } from '@/components/NotesManager'
-import type { Note, Invoice } from '@/lib/types'
+import { format } from 'date-fns'
+import { MobileTransactionCard } from '@/components/MobileTransactionCard'
+import { InvoiceStatusBadge } from '@/components/invoices/InvoiceStatusBadge'
+import { InvoiceStatsCards } from '@/components/invoices/InvoiceStatsCards'
+import { RecordCollectionModal } from '@/components/invoices/RecordCollectionModal'
+import { AllocateIncomeModal } from '@/components/invoices/AllocateIncomeModal'
+import { PaymentHistoryModal } from '@/components/PaymentHistoryModal'
 import {
   Table,
   TableBody,
@@ -19,6 +23,12 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -27,49 +37,63 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { format } from 'date-fns'
-import { MobileTransactionCard } from '@/components/MobileTransactionCard'
+import type { Invoice } from '@/lib/types'
+
+type FilterType = 'OUTSTANDING' | 'SETTLED' | 'MONTHLY' | 'ALL'
 
 export default function Invoices() {
   const { orgSlug } = useParams()
   const [searchQuery, setSearchQuery] = useState('')
-  const { data: invoices, isLoading } = useInvoices()
+  const [activeFilter, setActiveFilter] = useState<FilterType>('ALL')
+
+  const { data: invoices, isLoading: loadingInvoices } = useInvoices()
+  const { data: collections, isLoading: loadingCollections } = useIncome()
   const deleteInvoice = useDeleteInvoice()
   const updateInvoice = useUpdateInvoice()
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
 
-  const handleView = (invoice: Invoice) => {
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false)
+  const [isAllocateModalOpen, setIsAllocateModalOpen] = useState(false)
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'invoice'; title: string } | null>(null)
+
+  // Handlers
+  const handleRecordCollection = (invoice: Invoice) => {
     setSelectedInvoice(invoice)
-    setIsViewModalOpen(true)
+    setIsRecordModalOpen(true)
   }
 
-  const handleHistory = (invoice: Invoice) => {
+  const handleViewHistory = (invoice: Invoice) => {
     setSelectedInvoice(invoice)
     setIsHistoryModalOpen(true)
   }
 
-  const filteredInvoices = invoices?.filter((invoice) => {
-    const searchMatch = 
-      invoice.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.project?.project_id_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.project?.customer?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.customer?.name.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    return searchMatch
-  })
-
-  const handleDelete = (id: string) => {
-    deleteInvoice.mutate(id)
+  const handleAllocateIncome = (invoice: Invoice) => {
+    setSelectedInvoice(invoice)
+    setIsAllocateModalOpen(true)
   }
 
-  if (isLoading) {
+  const filteredInvoices = invoices?.filter(inv => {
+    const collected = inv.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0
+    const isPaid = collected >= inv.total_amount - 0.1
+    
+    if (activeFilter === 'OUTSTANDING' && isPaid) return false
+    if (activeFilter === 'SETTLED' && !isPaid) return false
+    if (activeFilter === 'MONTHLY') {
+      const date = new Date(inv.date)
+      const now = new Date()
+      if (date.getMonth() !== now.getMonth() || date.getFullYear() !== now.getFullYear()) return false
+    }
+    
+    const searchStr = `${inv.invoice_number} ${inv.project?.project_id_code} ${inv.project?.customer?.name} ${inv.customer?.name}`.toLowerCase()
+    return searchStr.includes(searchQuery.toLowerCase())
+  })
+
+  if (loadingInvoices || loadingCollections) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Loading invoices...</div>
+        <div className="text-muted-foreground italic">Syncing Invoices & Collections...</div>
       </div>
     )
   }
@@ -78,160 +102,121 @@ export default function Invoices() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
-          <p className="text-muted-foreground mt-1">
-            Track and manage sales invoices
+          <h1 className="text-2xl font-bold tracking-tight">Invoices</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Manage your receivables and billing status
           </p>
         </div>
-        <Button asChild>
-          <Link to={`/${orgSlug}/invoices/new`}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Invoice
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link to={`/${orgSlug}/income/new`}>
+              <Plus className="mr-2 h-3 w-3" />
+              Quick Collection
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link to={`/${orgSlug}/invoices/new`}>
+              <Plus className="mr-2 h-3 w-3" />
+              New Invoice
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      <InvoiceStatsCards 
+        invoices={invoices}
+        income={collections}
+        activeFilter={activeFilter}
+        onOutstandingClick={() => setActiveFilter(prev => prev === 'OUTSTANDING' ? 'ALL' : 'OUTSTANDING')}
+        onSettledClick={() => setActiveFilter(prev => prev === 'SETTLED' ? 'ALL' : 'SETTLED')}
+        onMonthlyCollectionsClick={() => setActiveFilter(prev => prev === 'MONTHLY' ? 'ALL' : 'MONTHLY')}
+      />
 
       <div className="flex flex-col sm:flex-row gap-4 items-center">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by invoice #, project, or customer..."
+            placeholder="Search invoices by number, project or customer..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-9"
           />
         </div>
       </div>
 
+      {/* DESKTOP VIEW */}
       <div className="hidden md:block">
-        <Card>
+        <Card className="border-none shadow-sm overflow-hidden">
           <CardContent className="p-0">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Project / Customer</TableHead>
-                  <TableHead>Taxable Value</TableHead>
+                  <TableHead className="w-[120px]">Date</TableHead>
+                  <TableHead>Invoice & Project</TableHead>
+                  <TableHead>Amount</TableHead>
                   <TableHead>GST</TableHead>
-                  <TableHead>Total Amount</TableHead>
-                  <TableHead>Pending</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInvoices?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No invoices found.
-                    </TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground italic">No invoices found matching filters.</TableCell></TableRow>
                 ) : (
-                  filteredInvoices?.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">
-                        {format(new Date(invoice.date), 'dd MMM yyyy')}
+                  filteredInvoices?.map(inv => (
+                    <TableRow key={inv.id} className="hover:bg-muted/30">
+                      <TableCell className="text-xs font-semibold py-4">
+                        {format(new Date(inv.date), 'dd MMM yyyy')}
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm font-semibold">{invoice.invoice_number}</span>
-                      </TableCell>
-                      <TableCell>
-                        {invoice.project ? (
-                          <div className="flex flex-col">
-                            <span className="font-mono text-xs font-semibold">{invoice.project.project_id_code}</span>
-                            <span className="text-sm">{invoice.project.customer?.name}</span>
-                          </div>
-                        ) : invoice.customer ? (
-                          <span className="text-sm font-medium">{invoice.customer.name}</span>
-                        ) : (
-                          <span className="text-muted-foreground italic">No Project / Customer</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        ₹{invoice.taxable_value.toLocaleString('en-IN')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{invoice.gst_percentage}%</Badge>
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          ₹{invoice.gst_amount.toLocaleString('en-IN')}
+                        <div className="flex flex-col">
+                          <span className="font-mono text-sm font-bold text-blue-600">{inv.invoice_number}</span>
+                          <span className="text-xs text-muted-foreground">{inv.project?.project_id_code} • {inv.project?.customer?.name || inv.customer?.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-semibold text-green-600">
-                        ₹{invoice.total_amount.toLocaleString('en-IN')}
+                      <TableCell className="font-bold whitespace-nowrap">
+                        ₹{inv.total_amount.toLocaleString('en-IN')}
                       </TableCell>
-                      <TableCell className="font-semibold">
-                        <div className="flex items-center gap-2">
-                          {(invoice.total_amount - (invoice.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)) <= 0 ? (
-                            <Badge variant="success">Paid</Badge>
-                          ) : (
-                            <span className="text-orange-600">
-                              ₹{(invoice.total_amount - (invoice.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)).toLocaleString('en-IN')}
-                            </span>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => handleHistory(invoice)}
-                            title="View Payment History"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      <TableCell>
+                        <div className="text-[10px] uppercase font-bold text-muted-foreground leading-none mb-1">GST {inv.gst_percentage}%</div>
+                        <div className="text-xs font-medium">₹{inv.gst_amount.toLocaleString('en-IN')}</div>
+                      </TableCell>
+                      <TableCell>
+                        <InvoiceStatusBadge 
+                          invoice={inv} 
+                          onPayClick={handleRecordCollection}
+                          onAllocateClick={handleAllocateIncome}
+                          onViewHistoryClick={handleViewHistory}
+                        />
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2 text-primary">
+                        <div className="flex justify-end gap-1">
                           <NotesManager
-                            notes={invoice.notes}
-                            onUpdate={async (newNotes: Note[]) => {
-                              await updateInvoice.mutateAsync({
-                                id: invoice.id,
-                                input: { notes: newNotes }
-                              })
+                            notes={inv.notes}
+                            onUpdate={async (newNotes) => {
+                              await updateInvoice.mutateAsync({ id: inv.id, input: { notes: newNotes } })
                             }}
-                            title={`Notes for Invoice ${invoice.invoice_number}`}
-                            entityName={`Invoice ${invoice.invoice_number}`}
+                            title={`Notes: ${inv.invoice_number}`}
+                            entityName="Invoice"
                           />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleView(invoice)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                          >
-                            <Link to={`/${orgSlug}/invoices/${invoice.id}/edit`}>
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete invoice {invoice.invoice_number} of ₹{invoice.total_amount.toLocaleString('en-IN')}? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(invoice.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link to={`/${orgSlug}/invoices/${inv.id}/edit`} className="flex items-center">
+                                  <Pencil className="mr-2 h-3 w-3" /> Edit Invoice
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-destructive font-medium"
+                                onClick={() => setDeleteConfirm({ id: inv.id, type: 'invoice', title: inv.invoice_number })}
+                              >
+                                <Trash2 className="mr-2 h-3 w-3" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -243,93 +228,96 @@ export default function Invoices() {
         </Card>
       </div>
 
-      <div className="md:hidden space-y-4">
-        {filteredInvoices?.map((invoice) => (
+      {/* MOBILE VIEW */}
+      <div className="md:hidden space-y-4 pb-20">
+        {filteredInvoices?.map(inv => (
           <MobileTransactionCard
-            key={invoice.id}
-            title={format(new Date(invoice.date), 'dd MMM yyyy')}
-            badge={<Badge variant="outline">{invoice.invoice_number}</Badge>}
+            key={inv.id}
+            title={format(new Date(inv.date), 'dd MMM yyyy')}
+            badge={<span className="font-mono font-bold text-blue-600">{inv.invoice_number}</span>}
             fields={[
+              { label: 'Client / Proj', value: `${inv.project?.customer?.name || inv.customer?.name} (${inv.project?.project_id_code})` },
+              { label: 'Amount', value: `₹${inv.total_amount.toLocaleString('en-IN')}`, className: 'font-bold' },
               { 
-                label: 'Project', 
-                value: invoice.project ? (
-                  <div className="flex flex-col items-end">
-                    <span className="font-mono text-xs">{invoice.project.project_id_code}</span>
-                    <span className="text-xs text-muted-foreground">{invoice.project.customer?.name}</span>
-                  </div>
-                ) : invoice.customer ? (
-                  <span className="text-xs font-medium">{invoice.customer.name}</span>
-                ) : 'No Project'
-              },
-              {
-                label: 'Taxable Value',
-                value: `₹${invoice.taxable_value.toLocaleString('en-IN')}`
-              },
-              {
-                label: 'GST',
-                value: `${invoice.gst_percentage}% (₹${invoice.gst_amount.toLocaleString('en-IN')})`
-              },
-              { 
-                label: 'Total', 
-                value: `₹${invoice.total_amount.toLocaleString('en-IN')}`, 
-                className: 'text-green-600 font-bold' 
-              },
-              {
-                label: 'Pending',
-                value: (
-                  <div className="flex items-center gap-2">
-                    {(invoice.total_amount - (invoice.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)) <= 0 ? (
-                      <Badge variant="success">Paid</Badge>
-                    ) : (
-                      <span className="text-orange-600 font-bold">
-                        ₹{(invoice.total_amount - (invoice.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)).toLocaleString('en-IN')}
-                      </span>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => handleHistory(invoice)}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ),
+                label: 'Status', 
+                value: <InvoiceStatusBadge 
+                  invoice={inv} 
+                  onPayClick={handleRecordCollection}
+                  onAllocateClick={handleAllocateIncome}
+                  onViewHistoryClick={handleViewHistory}
+                /> 
               }
             ]}
-            notesProps={{
-              notes: invoice.notes,
+            notesProps={{ 
+              notes: inv.notes, 
               onUpdate: async (newNotes) => {
-                await updateInvoice.mutateAsync({
-                  id: invoice.id,
-                  input: { notes: newNotes }
-                })
-              },
-              title: `Notes for Invoice ${invoice.invoice_number}`,
-              entityName: `Invoice ${invoice.invoice_number}`
+                await updateInvoice.mutateAsync({ id: inv.id, input: { notes: newNotes } })
+              }, 
+              title: inv.invoice_number, 
+              entityName: 'Invoice' 
             }}
-            editLink={`/${orgSlug}/invoices/${invoice.id}/edit`}
-            onDelete={() => handleDelete(invoice.id)}
-            deleteTitle="Delete Invoice"
-            deleteDescription={`Are you sure you want to delete invoice ${invoice.invoice_number} of ₹${invoice.total_amount.toLocaleString('en-IN')}?`}
+            editLink={`/${orgSlug}/invoices/${inv.id}/edit`}
+            onDelete={() => setDeleteConfirm({ id: inv.id, type: 'invoice', title: inv.invoice_number })}
           />
         ))}
       </div>
 
-      <InvoiceViewModal
+      {/* Floating Action Button (Mobile) */}
+      <div className="fixed bottom-6 right-6 md:hidden">
+        <Button asChild className="rounded-full h-14 w-14 shadow-2xl">
+          <Link to={`/${orgSlug}/invoices/new`}>
+            <Plus className="h-6 w-6" />
+          </Link>
+        </Button>
+      </div>
+
+      {/* Modals */}
+      <RecordCollectionModal
+        isOpen={isRecordModalOpen}
+        onClose={() => setIsRecordModalOpen(false)}
+        initialInvoice={selectedInvoice}
+      />
+
+      <AllocateIncomeModal 
+        isOpen={isAllocateModalOpen}
+        onClose={() => setIsAllocateModalOpen(false)}
         invoice={selectedInvoice}
-        isOpen={isViewModalOpen}
-        onClose={() => setIsViewModalOpen(false)}
       />
 
       <PaymentHistoryModal
-        title={selectedInvoice?.invoice_number || ''}
-        totalLabel="Total Amount"
+        title={selectedInvoice?.invoice_number || 'Collection History'}
+        totalLabel="Invoice Amount"
         totalAmount={selectedInvoice?.total_amount || 0}
         income={selectedInvoice?.income}
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}
       />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the {deleteConfirm?.type} <strong>{deleteConfirm?.title}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteConfirm) {
+                  deleteInvoice.mutate(deleteConfirm.id)
+                }
+                setDeleteConfirm(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

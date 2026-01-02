@@ -16,6 +16,7 @@ import Customers from './pages/customers/Customers'
 import CustomerForm from './pages/customers/CustomerForm'
 import Vendors from './pages/vendors/Vendors'
 import VendorForm from './pages/vendors/VendorForm'
+import VendorLedger from './pages/vendors/VendorLedger'
 import BankAccounts from './pages/bank-accounts/BankAccounts'
 import BankAccountForm from './pages/bank-accounts/BankAccountForm'
 import GSTSummary from './pages/stats/GSTSummary'
@@ -63,6 +64,7 @@ function App() {
         <Route path="vendors" element={<Vendors />} />
         <Route path="vendors/new" element={<VendorForm />} />
         <Route path="vendors/:id/edit" element={<VendorForm />} />
+        <Route path="vendors/:id/ledger" element={<VendorLedger />} />
 
         <Route path="bank-accounts" element={<BankAccounts />} />
         <Route path="bank-accounts/new" element={<BankAccountForm />} />

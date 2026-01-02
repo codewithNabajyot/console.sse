@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, ChevronRight, MoreVertical } from 'lucide-react'
 import { useIncome, useDeleteIncome, useUpdateIncome } from '@/hooks/useIncome'
+import { IncomeStatsCards } from '@/components/income/IncomeStatsCards'
+import { QuickLinkInvoiceModal } from '@/components/income/QuickLinkInvoiceModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -17,27 +19,37 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { format } from 'date-fns'
 import { MobileTransactionCard } from '@/components/MobileTransactionCard'
+
+type FilterType = 'UNALLOCATED' | 'MONTHLY' | 'TOTAL' | 'ALL'
 
 export default function IncomeList() {
   const { orgSlug } = useParams()
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeFilter, setActiveFilter] = useState<FilterType>('ALL')
+  const [selectedIncome, setSelectedIncome] = useState<any>(null)
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
+
   const { data: incomeRecords, isLoading } = useIncome()
   const deleteIncome = useDeleteIncome()
   const updateIncome = useUpdateIncome()
 
   const filteredIncome = incomeRecords?.filter((record) => {
+    // Stats Filtering
+    if (activeFilter === 'UNALLOCATED' && record.invoice_id) return false
+    if (activeFilter === 'MONTHLY') {
+      const date = new Date(record.date)
+      const now = new Date()
+      if (date.getMonth() !== now.getMonth() || date.getFullYear() !== now.getFullYear()) return false
+    }
+
+    // Search Filtering
     const searchMatch = 
       record.received_from?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.project?.project_id_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -78,6 +90,14 @@ export default function IncomeList() {
         </Button>
       </div>
 
+      <IncomeStatsCards 
+        income={incomeRecords}
+        activeFilter={activeFilter}
+        onTotalClick={() => setActiveFilter(prev => prev === 'TOTAL' ? 'ALL' : 'TOTAL')}
+        onUnallocatedClick={() => setActiveFilter(prev => prev === 'UNALLOCATED' ? 'ALL' : 'UNALLOCATED')}
+        onMonthlyClick={() => setActiveFilter(prev => prev === 'MONTHLY' ? 'ALL' : 'MONTHLY')}
+      />
+
       <div className="flex flex-col sm:flex-row gap-4 items-center">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -100,7 +120,8 @@ export default function IncomeList() {
                   <TableHead>Project / Customer</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>Bank Account</TableHead>
+                  <TableHead>Bank & Method</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -119,9 +140,6 @@ export default function IncomeList() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          {record.invoice && (
-                            <span className="font-mono text-[10px] font-bold text-blue-600">INV: {record.invoice.invoice_number}</span>
-                          )}
                           {record.project ? (
                             <>
                               <span className="font-mono text-xs font-semibold">{record.project.project_id_code}</span>
@@ -143,11 +161,36 @@ export default function IncomeList() {
                       <TableCell>
                         <div className="text-sm">
                           {record.bank_account?.account_name}
-                          <div className="text-xs text-muted-foreground">{record.bank_account?.bank_name}</div>
+                          <div className="text-[10px] text-muted-foreground uppercase font-bold">
+                            {record.payment_mode || 'N/A'} • {record.bank_account?.bank_name}
+                          </div>
                         </div>
                       </TableCell>
+                      <TableCell>
+                        {record.invoice ? (
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold leading-tight">Linked to</span>
+                            <span className="font-mono text-[10px] font-bold text-blue-600">INV: {record.invoice.invoice_number}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 group/status">
+                            <Badge variant="outline" className="text-[9px] h-4 bg-amber-50 text-amber-600 border-amber-200 uppercase font-bold px-1.5">Unallocated</Badge>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 text-muted-foreground hover:text-amber-600 transition-all"
+                              onClick={() => {
+                                setSelectedIncome(record)
+                                setIsLinkModalOpen(true)
+                              }}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2 text-primary">
+                        <div className="flex justify-end gap-1">
                           <NotesManager
                             notes={record.notes}
                             onUpdate={async (newNotes: Note[]) => {
@@ -156,42 +199,33 @@ export default function IncomeList() {
                                 input: { notes: newNotes }
                               })
                             }}
-                            title={`Notes for Income ₹${record.amount.toLocaleString('en-IN')}`}
+                            title={`Notes: Collection ₹${record.amount.toLocaleString('en-IN')}`}
                             entityName="Income Record"
                           />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                          >
-                            <Link to={`/${orgSlug}/income/${record.id}/edit`}>
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Record</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this income record of ₹{record.amount.toLocaleString('en-IN')}? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(record.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link to={`/${orgSlug}/income/${record.id}/edit`} className="flex items-center">
+                                  <Pencil className="mr-2 h-3 w-3" /> Edit Record
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-destructive font-medium"
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to delete this income record of ₹${record.amount.toLocaleString('en-IN')}?`)) {
+                                    handleDelete(record.id)
+                                  }
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-3 w-3" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -214,9 +248,6 @@ export default function IncomeList() {
                 label: 'Source', 
                 value: (
                   <div className="flex flex-col items-end">
-                    {record.invoice && (
-                      <span className="font-mono text-[10px] font-bold text-blue-600">INV: {record.invoice.invoice_number}</span>
-                    )}
                     {record.project ? (
                       <>
                         <span className="font-mono text-xs">{record.project.project_id_code}</span>
@@ -234,8 +265,37 @@ export default function IncomeList() {
                 className: 'text-green-600 font-bold' 
               },
               { 
-                label: 'Bank', 
-                value: record.bank_account?.account_name 
+                label: 'Bank & Method', 
+                value: (
+                  <div className="flex flex-col items-end text-right">
+                    <span>{record.bank_account?.account_name}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold">{record.payment_mode || 'N/A'}</span>
+                  </div>
+                )
+              },
+              {
+                label: 'Status',
+                value: record.invoice ? (
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold leading-none">Linked</span>
+                    <span className="font-mono text-[10px] font-bold text-blue-600">INV: {record.invoice.invoice_number}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-[9px] h-4 bg-amber-50 text-amber-600 border-amber-200 uppercase font-bold px-1.5">Unallocated</Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 text-amber-600"
+                      onClick={() => {
+                        setSelectedIncome(record)
+                        setIsLinkModalOpen(true)
+                      }}
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )
               }
             ]}
             notesProps={{
@@ -256,6 +316,14 @@ export default function IncomeList() {
           />
         ))}
       </div>
+      <QuickLinkInvoiceModal 
+        income={selectedIncome}
+        isOpen={isLinkModalOpen}
+        onClose={() => {
+          setIsLinkModalOpen(false)
+          setSelectedIncome(null)
+        }}
+      />
     </div>
   )
 }

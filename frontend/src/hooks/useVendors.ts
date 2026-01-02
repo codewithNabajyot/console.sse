@@ -144,3 +144,79 @@ export function useDeleteVendor() {
     },
   })
 }
+// Fetch ledger for a vendor (Expenses + Payments)
+export function useVendorLedger(vendorId: string | undefined) {
+  const { profile } = useAuth()
+  const orgId = profile?.org_id
+
+  return useQuery({
+    queryKey: ['vendor_ledger', orgId, vendorId],
+    queryFn: async () => {
+      if (!vendorId) return { transactions: [], totalBilled: 0, totalPaid: 0, balance: 0 }
+      if (!orgId) throw new Error('Organization ID is required')
+      
+      // Fetch Expenses
+      const { data: expenses, error: expError } = await supabase
+        .from('expenses')
+        .select('*, project:projects(project_id_code)')
+        .eq('vendor_id', vendorId)
+        .eq('org_id', orgId)
+        .is('deleted_at', null)
+
+      if (expError) throw expError
+
+      // Fetch Payments
+      const { data: payments, error: payError } = await supabase
+        .from('expense_payments')
+        .select('*')
+        .eq('vendor_id', vendorId)
+        .eq('org_id', orgId)
+
+      if (payError) throw payError
+
+      // Combine and Sort
+      const transactions = [
+        ...(expenses || []).map(exp => ({
+          id: exp.id,
+          date: exp.date,
+          number: exp.expense_number || 'EXP-???',
+          type: 'Bill' as const,
+          description: exp.description,
+          project: exp.project?.project_id_code,
+          debit: exp.total_paid, // Increases what we owe
+          credit: 0
+        })),
+        ...(payments || []).map(pay => ({
+          id: pay.id,
+          date: pay.date,
+          number: pay.payment_number || 'VPAY-???',
+          type: 'Payment' as const,
+          description: `Payment via ${pay.payment_mode || 'Bank'}`,
+          project: '-',
+          debit: 0,
+          credit: pay.amount // Decreases what we owe
+        }))
+      ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+      // Calculate Running Balance and Totals
+      let runningBalance = 0
+      let totalBilled = 0
+      let totalPaid = 0
+      
+      const ledgerTransactions = transactions.map(t => {
+        runningBalance += (t.debit - t.credit)
+        totalBilled += t.debit
+        totalPaid += t.credit
+        return { ...t, balance: runningBalance }
+      })
+
+      return {
+        transactions: ledgerTransactions.reverse(), // Show newest first in UI but calculation was chronological
+        totalBilled,
+        totalPaid,
+        balance: runningBalance
+      }
+    },
+    enabled: !!vendorId && !!orgId,
+  })
+}
