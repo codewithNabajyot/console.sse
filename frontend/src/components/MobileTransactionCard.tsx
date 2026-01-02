@@ -48,7 +48,8 @@ export function MobileTransactionCard({
   onEdit,
   onDelete,
   deleteTitle = "Delete Record",
-  deleteDescription = "Are you sure you want to delete this record? This action cannot be undone."
+  deleteDescription = "Are you sure you want to delete this record? This action cannot be undone.",
+  children
 }: MobileTransactionCardProps) {
   return (
     <Card>
@@ -67,6 +68,7 @@ export function MobileTransactionCard({
             </span>
           </div>
         ))}
+        {children}
         
         {(notesProps || editLink || onEdit || onDelete) && (
           <div className="flex justify-end gap-2 pt-2 border-t mt-3">

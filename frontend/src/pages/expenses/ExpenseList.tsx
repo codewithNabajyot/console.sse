@@ -26,7 +26,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { format } from 'date-fns'
 import { MobileTransactionCard } from '@/components/MobileTransactionCard'
@@ -56,6 +55,7 @@ export default function ExpenseList() {
   const [allocatingPayment, setAllocatingPayment] = useState<ExpensePayment | null>(null)
   const [viewingAllocation, setViewingAllocation] = useState<{ type: 'payment' | 'expense', record: ExpensePayment | Expense } | null>(null)
   const [payingBill, setPayingBill] = useState<{ id: string, expense_number?: string, vendor_id: string, project_id?: string | null, amount: number } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'expense' | 'payment'; title: string; amount: number } | null>(null)
 
   // Expenses Hooks
   const { data: expenses, isLoading: isLoadingExpenses } = useExpenses()
@@ -182,9 +182,9 @@ export default function ExpenseList() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Expenses & Bills</h1>
-          <p className="text-muted-foreground mt-1">
-            Track what you owe and settlements you've made
+          <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Track and manage bills and payments
           </p>
         </div>
         <div className="flex gap-2">
@@ -231,7 +231,7 @@ export default function ExpenseList() {
             placeholder="Search bills, vendors, bank accounts..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-11"
+            className="pl-10 h-9"
           />
         </div>
       </div>
@@ -253,7 +253,7 @@ export default function ExpenseList() {
             <Card>
               <CardContent className="p-0">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-muted/50">
                     <TableRow>
                       <TableHead className="w-[180px]">Bill & Project</TableHead>
                       <TableHead className="w-[120px]">Date</TableHead>
@@ -304,8 +304,11 @@ export default function ExpenseList() {
                               <TableCell>
                                 <Badge variant="outline" className="font-normal text-xs whitespace-nowrap">{record.category || 'N/A'}</Badge>
                               </TableCell>
-                              <TableCell className="font-bold text-red-600/80">
-                                ₹{record.total_paid.toLocaleString('en-IN')}
+                              <TableCell className="font-bold whitespace-nowrap">
+                                <div>₹{record.total_paid.toLocaleString('en-IN')}</div>
+                                <div className="text-[10px] uppercase font-bold text-muted-foreground leading-none mt-1">
+                                  GST {record.gst_percentage}% (₹{record.gst_amount.toLocaleString('en-IN')})
+                                </div>
                               </TableCell>
                               <TableCell>
                                  <div className="flex flex-col gap-1">
@@ -332,79 +335,39 @@ export default function ExpenseList() {
                                  </div>
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className="flex justify-end items-center gap-1">
-                                  {!record.bank_account_id && allocated < record.total_paid - 0.1 && (
-                                     <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className="h-8 px-3 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 font-bold transition-all"
-                                        onClick={() => {
-                                           setPayingBill({
-                                              id: record.id,
-                                              expense_number: record.expense_number,
-                                              vendor_id: record.vendor_id!,
-                                              project_id: record.project_id,
-                                              amount: record.total_paid - allocated
-                                           })
-                                           setIsPaymentModalOpen(true)
-                                        }}
-                                     >
-                                        Pay
-                                     </Button>
-                                  )}
-
+                                <div className="flex justify-end gap-1">
+                                  <NotesManager
+                                    notes={record.notes}
+                                    onUpdate={async (newNotes: Note[]) => {
+                                      await updateExpense.mutateAsync({
+                                        id: record.id,
+                                        input: { notes: newNotes }
+                                      })
+                                    }}
+                                    title={`Notes for ${record.vendor?.name || 'Expense'}`}
+                                    entityName={record.vendor?.name || 'Expense Record'}
+                                  />
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
+                                    <DropdownMenuContent align="end">
                                       <DropdownMenuItem asChild>
-                                        <Link to={`/${orgSlug}/expenses/${record.id}/edit`} className="flex items-center gap-2 cursor-pointer">
-                                          <Pencil className="h-3.5 w-3.5" /> Edit
+                                        <Link to={`/${orgSlug}/expenses/${record.id}/edit`} className="flex items-center">
+                                          <Pencil className="mr-2 h-3 w-3" /> Edit Expense
                                         </Link>
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                        <div className="-mx-2 -my-1.5 w-[calc(100%+1rem)] py-1.5 px-2 flex items-center gap-2 whitespace-nowrap">
-                                          <NotesManager
-                                            notes={record.notes}
-                                            onUpdate={async (newNotes: Note[]) => {
-                                              await updateExpense.mutateAsync({
-                                                id: record.id,
-                                                input: { notes: newNotes }
-                                              })
-                                            }}
-                                            title={`Notes for ${record.vendor?.name || 'Expense'}`}
-                                            entityName={record.vendor?.name || 'Expense Record'}
-                                          />
-                                          <span className="text-sm">Notes</span>
-                                        </div>
+                                      <DropdownMenuItem 
+                                        className="text-destructive font-medium"
+                                        onClick={() => setDeleteConfirm({ 
+                                          id: record.id, 
+                                          type: 'expense', 
+                                          title: record.expense_number || 'Expense',
+                                          amount: record.total_paid
+                                        })}
+                                      >
+                                        <Trash2 className="mr-2 h-3 w-3" /> Delete
                                       </DropdownMenuItem>
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                          <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive flex items-center gap-2 cursor-pointer font-medium">
-                                            <Trash2 className="h-3.5 w-3.5" /> Delete
-                                          </DropdownMenuItem>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>Delete Record</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Are you sure you want to delete this expense record of ₹{record.total_paid.toLocaleString('en-IN')}?
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction
-                                              onClick={() => handleDeleteExpense(record.id)}
-                                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                            >
-                                              Delete
-                                            </AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      </AlertDialog>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 </div>
@@ -423,23 +386,21 @@ export default function ExpenseList() {
             {filteredExpenses?.map((record) => (
               <MobileTransactionCard
                 key={record.id}
-                title={record.expense_number || 'Expense'}
-                badge={record.category ? <Badge variant="outline">{record.category}</Badge> : null}
+                title={format(new Date(record.date), 'dd MMM yyyy')}
+                badge={<span className="font-mono font-bold text-red-600">{record.expense_number || 'Exp'}</span>}
                 fields={[
                   { 
-                    label: 'Project', 
-                    value: record.project ? (
-                      <span className="font-mono text-xs">{record.project.project_id_code}</span>
-                    ) : 'Common'
-                  },
-                  {
-                    label: 'Description',
-                    value: <span className="line-clamp-1">{record.description || '—'}</span>
+                    label: 'Vendor / Project', 
+                    value: `${record.vendor?.name || '—'} (${record.project?.project_id_code || 'Common'})`
                   },
                   { 
                     label: 'Amount', 
-                    value: `₹${record.total_paid.toLocaleString('en-IN')}`, 
-                    className: 'text-red-600/80 font-bold' 
+                    value: (
+                      <div className="flex flex-col items-end">
+                        <span className="font-bold">₹{record.total_paid.toLocaleString('en-IN')}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">GST {record.gst_percentage}%</span>
+                      </div>
+                    )
                   },
                   {
                     label: 'Status',
@@ -461,32 +422,6 @@ export default function ExpenseList() {
                         className="text-xs"
                       />
                     )
-                  },
-                  {
-                    label: 'Vendor',
-                    value: (
-                      <div className="flex items-center gap-2">
-                        {record.vendor?.name || '—'}
-                          {record.vendor_id && vendorAdvances[record.vendor_id] > 0.1 && (
-                            <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full font-bold animate-pulse whitespace-nowrap">
-                              ₹{vendorAdvances[record.vendor_id].toLocaleString('en-IN')} CR
-                            </span>
-                          )}
-                      </div>
-                    )
-                  },
-                  {
-                    label: 'Links',
-                    value: (record.allocations?.length || 0) > 0 ? (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-6 w-6 text-muted-foreground"
-                        onClick={() => setViewingAllocation({ type: 'expense', record })}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    ) : '—'
                   }
                 ]}
                 notesProps={{
@@ -501,7 +436,12 @@ export default function ExpenseList() {
                   entityName: record.vendor?.name || 'Expense Record'
                 }}
                 editLink={`/${orgSlug}/expenses/${record.id}/edit`}
-                onDelete={() => handleDeleteExpense(record.id)}
+                onDelete={() => setDeleteConfirm({ 
+                  id: record.id, 
+                  type: 'expense', 
+                  title: record.expense_number || 'Expense',
+                  amount: record.total_paid
+                })}
                 deleteTitle="Delete Expense Record"
                 deleteDescription={`Are you sure you want to delete this expense record of ₹${record.total_paid.toLocaleString('en-IN')}?`}
               >
@@ -620,67 +560,44 @@ export default function ExpenseList() {
                                  </div>
                                </TableCell>
                                <TableCell className="text-right">
-                                 <div className="flex justify-end items-center gap-1">
+                                 <div className="flex justify-end gap-1">
+                                   <NotesManager
+                                     notes={record.notes}
+                                     onUpdate={async (newNotes: Note[]) => {
+                                       if (record.type === 'payment') {
+                                         await updatePayment.mutateAsync({
+                                           id: record.id,
+                                           input: { notes: newNotes }
+                                         })
+                                       } else {
+                                         await updateExpense.mutateAsync({
+                                           id: record.id,
+                                           input: { notes: newNotes }
+                                         })
+                                       }
+                                     }}
+                                     title={`Notes for ${record.type}`}
+                                     entityName={record.type}
+                                   />
                                    <DropdownMenu>
                                      <DropdownMenuTrigger asChild>
-                                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-                                         <MoreVertical className="h-4 w-4" />
-                                       </Button>
+                                       <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
                                      </DropdownMenuTrigger>
-                                     <DropdownMenuContent align="end" className="w-40">
-                                       {record.type === 'payment' ? (
-                                         <>
-                                           <DropdownMenuItem onClick={() => handleEditPayment(record.raw as ExpensePayment)} className="flex items-center gap-2 cursor-pointer">
-                                             <Pencil className="h-3.5 w-3.5" /> Edit
-                                           </DropdownMenuItem>
-                                           <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                             <div className="-mx-2 -my-1.5 w-[calc(100%+1rem)] py-1.5 px-2 flex items-center gap-2 whitespace-nowrap">
-                                               <NotesManager
-                                                 notes={record.notes}
-                                                 onUpdate={async (newNotes: Note[]) => {
-                                                   await updatePayment.mutateAsync({
-                                                     id: record.id,
-                                                     input: { notes: newNotes }
-                                                   })
-                                                 }}
-                                                 title={`Notes for Payment`}
-                                                 entityName={`Payment`}
-                                               />
-                                               <span className="text-sm">Notes</span>
-                                             </div>
-                                           </DropdownMenuItem>
-                                         </>
-                                       ) : (
-                                         <DropdownMenuItem asChild>
-                                           <Link to={`/${orgSlug}/expenses/${record.id}/edit`} className="flex items-center gap-2 cursor-pointer">
-                                             <Pencil className="h-3.5 w-3.5" /> Edit Expense
-                                           </Link>
-                                         </DropdownMenuItem>
-                                       )}
-                                       <AlertDialog>
-                                         <AlertDialogTrigger asChild>
-                                           <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive flex items-center gap-2 cursor-pointer font-medium">
-                                             <Trash2 className="h-3.5 w-3.5" /> Delete
-                                           </DropdownMenuItem>
-                                         </AlertDialogTrigger>
-                                         <AlertDialogContent>
-                                           <AlertDialogHeader>
-                                             <AlertDialogTitle>Delete {record.type === 'payment' ? 'Payment' : 'Expense'}</AlertDialogTitle>
-                                             <AlertDialogDescription>
-                                               Are you sure you want to delete this {record.type} of ₹{record.amount.toLocaleString('en-IN')}?
-                                             </AlertDialogDescription>
-                                           </AlertDialogHeader>
-                                           <AlertDialogFooter>
-                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                             <AlertDialogAction
-                                               onClick={() => record.type === 'payment' ? handleDeletePayment(record.id) : handleDeleteExpense(record.id)}
-                                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                             >
-                                               Delete
-                                             </AlertDialogAction>
-                                           </AlertDialogFooter>
-                                         </AlertDialogContent>
-                                       </AlertDialog>
+                                     <DropdownMenuContent align="end">
+                                       <DropdownMenuItem onClick={() => record.type === 'payment' ? handleEditPayment(record.raw as ExpensePayment) : navigate(`/${orgSlug}/expenses/${record.id}/edit`)} className="flex items-center">
+                                         <Pencil className="mr-2 h-3 w-3" /> Edit {record.type === 'payment' ? 'Payment' : 'Expense'}
+                                       </DropdownMenuItem>
+                                       <DropdownMenuItem 
+                                         className="text-destructive font-medium"
+                                         onClick={() => setDeleteConfirm({ 
+                                           id: record.id, 
+                                           type: record.type, 
+                                           title: record.payment_number || 'Payment',
+                                           amount: record.amount
+                                         })}
+                                       >
+                                         <Trash2 className="mr-2 h-3 w-3" /> Delete
+                                       </DropdownMenuItem>
                                      </DropdownMenuContent>
                                    </DropdownMenu>
                                  </div>
@@ -710,18 +627,16 @@ export default function ExpenseList() {
                          </div>
                        }
                        fields={[
-                          { label: 'Reference', value: record.payment_number || '—' },
-                          { label: 'Vendor', value: record.vendor?.name || 'Unknown' },
-                          { label: 'Bank', value: record.bank_account?.account_name || '—' },
+                          { label: 'Vendor / Bank', value: `${record.vendor?.name || 'Unknown'} (${record.bank_account?.account_name || '—'})` },
                           { 
                              label: 'Amount', 
                              value: `₹${record.amount.toLocaleString('en-IN')}`, 
-                             className: 'text-red-600 font-bold' 
+                             className: 'font-bold text-red-600' 
                           },
                           {
                              label: 'Status',
                              value: record.type === 'expense' ? (
-                               <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">Settled</Badge>
+                               <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">Settled (Direct)</Badge>
                              ) : (
                                unusedAmount > 0.1 ? (
                                  <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
@@ -746,7 +661,12 @@ export default function ExpenseList() {
                           entityName: record.type
                        }}
                        onEdit={() => record.type === 'payment' ? handleEditPayment(record.raw as ExpensePayment) : navigate(`/${orgSlug}/expenses/${record.id}/edit`)}
-                       onDelete={() => record.type === 'payment' ? handleDeletePayment(record.id) : handleDeleteExpense(record.id)}
+                       onDelete={() => setDeleteConfirm({ 
+                         id: record.id, 
+                         type: record.type, 
+                         title: (record.type === 'payment' ? record.payment_number : (record.raw as Expense).expense_number) || (record.type === 'payment' ? 'Payment' : 'Expense'),
+                         amount: record.amount
+                       })}
                        deleteTitle={`Delete ${record.type}`}
                        deleteDescription={`Are you sure?`}
                     />
@@ -782,6 +702,36 @@ export default function ExpenseList() {
             record={viewingAllocation.record}
          />
       )}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the {deleteConfirm?.type} <strong>{deleteConfirm?.title}</strong> of ₹{deleteConfirm?.amount.toLocaleString('en-IN')}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteConfirm) {
+                  if (deleteConfirm.type === 'payment') {
+                    handleDeletePayment(deleteConfirm.id)
+                  } else {
+                    handleDeleteExpense(deleteConfirm.id)
+                  }
+                }
+                setDeleteConfirm(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

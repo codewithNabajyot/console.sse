@@ -46,51 +46,62 @@ export function ExpenseStatsCards({
 
   const stats = [
     {
+      id: "OUTSTANDING",
       label: "Total Outstanding",
       value: `₹${totalOutstanding.toLocaleString('en-IN')}`,
       icon: Clock,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
+      activeClass: "bg-primary text-primary-foreground ring-2 ring-primary",
+      iconColor: "text-primary",
       onClick: onOutstandingClick,
       isActive: isActiveOutstanding,
     },
     {
-      label: "Expenses (This Month)",
+      id: "EXPENSES",
+      label: "Expenses (Month)",
       value: `₹${totalExpensesThisMonth.toLocaleString('en-IN')}`,
       icon: TrendingUp,
-      color: "text-red-600",
-      bgColor: "bg-red-50",
+      activeClass: "bg-red-600 text-white ring-2 ring-red-600",
+      iconColor: "text-red-600",
+      isActive: false,
     },
     {
+      id: "ADVANCES",
       label: "Unused Advances",
       value: `₹${unusedPaymentBalance.toLocaleString('en-IN')}`,
       icon: Wallet,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
+      activeClass: "bg-green-600 text-white ring-2 ring-green-600",
+      iconColor: "text-green-600",
       onClick: onUnusedAdvancesClick,
       isActive: isActiveUnused,
     },
   ]
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {stats.map((stat) => (
         <Card 
-          key={stat.label} 
+          key={stat.id} 
           className={cn(
-            "transition-all duration-200 border-2",
-            stat.onClick ? "cursor-pointer hover:border-primary/30" : "cursor-default",
-            stat.isActive ? "border-primary bg-primary/[0.02] ring-1 ring-primary/20 shadow-md" : "border-transparent"
+            "cursor-pointer transition-all hover:ring-2 hover:ring-primary/20",
+            stat.isActive ? stat.activeClass : "bg-card text-card-foreground"
           )}
           onClick={stat.onClick}
         >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className={cn("p-2 rounded-lg transition-colors", stat.isActive ? "bg-primary text-white" : stat.bgColor)}>
-              <stat.icon className={cn("h-5 w-5", stat.isActive ? "text-white" : stat.color)} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-              <h3 className="text-xl font-bold">{stat.value}</h3>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={cn(
+                  "text-sm font-medium", 
+                  stat.isActive ? "opacity-90" : "text-muted-foreground"
+                )}>
+                  {stat.label}
+                </p>
+                <h3 className="text-2xl font-bold">{stat.value}</h3>
+              </div>
+              <stat.icon className={cn(
+                "h-8 w-8", 
+                stat.isActive ? "opacity-40" : cn(stat.iconColor, "opacity-20")
+              )} />
             </div>
           </CardContent>
         </Card>
