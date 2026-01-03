@@ -78,6 +78,7 @@ export default function ExpenseList() {
     if (!searchMatch) return false
     
     if (outstandingOnly) {
+      if (record.bank_account_id) return false
       const allocated = record.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
       return allocated < record.total_paid - 0.1
     }
@@ -210,6 +211,7 @@ export default function ExpenseList() {
           } else {
             setActiveTab('expenses')
             setOutstandingOnly(true)
+            setUnusedOnly(false)
           }
         }}
         onUnusedAdvancesClick={() => {
@@ -218,6 +220,7 @@ export default function ExpenseList() {
           } else {
             setActiveTab('payments')
             setUnusedOnly(true)
+            setOutstandingOnly(false)
           }
         }}
         isActiveOutstanding={outstandingOnly}
