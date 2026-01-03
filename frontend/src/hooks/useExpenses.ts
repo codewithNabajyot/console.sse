@@ -18,6 +18,7 @@ export function useExpenses(includeDeleted = false) {
         .from('expenses')
         .select('*, project:projects(*, customer:customers(*)), vendor:vendors(*), bank_account:bank_accounts(*), allocations:payment_allocations(*, payment:expense_payments(*, vendor:vendors(*)))')
         .eq('org_id', orgId)
+        .is('allocations.payment.deleted_at', null)
       
       if (!includeDeleted) {
         query = query.is('deleted_at', null)

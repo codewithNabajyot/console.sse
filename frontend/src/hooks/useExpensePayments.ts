@@ -18,6 +18,8 @@ export function useExpensePayments() {
         .from('expense_payments')
         .select('*, vendor:vendors(*), bank_account:bank_accounts(*), project:projects(*), allocations:payment_allocations(*, expense:expenses(*, project:projects(*, customer:customers(*))))')
         .eq('org_id', orgId)
+        .is('deleted_at', null)
+        .is('allocations.expense.deleted_at', null)
         .order('date', { ascending: false })
 
       if (error) throw error
@@ -120,7 +122,7 @@ export function useDeleteExpensePayment() {
       
       const { error } = await supabase
         .from('expense_payments')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
         .eq('org_id', orgId)
 
@@ -250,6 +252,7 @@ export function usePaymentAllocations(paymentId: string | undefined) {
         .from('payment_allocations')
         .select('*, expense:expenses(*)')
         .eq('payment_id', paymentId)
+        .is('expense.deleted_at', null)
 
       if (error) throw error
       return data as PaymentAllocation[]

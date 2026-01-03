@@ -18,6 +18,8 @@ export function useProjects(includeDeleted = false) {
         .from('projects')
         .select('*, customer:customers(*), income(*, bank_account:bank_accounts(*)), expenses(*, vendor:vendors(*))')
         .eq('org_id', orgId)
+        .is('income.deleted_at', null)
+        .is('expenses.deleted_at', null)
       
       if (!includeDeleted) {
         query = query.is('deleted_at', null)

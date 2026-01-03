@@ -18,6 +18,7 @@ export function useInvoices(includeDeleted = false) {
         .from('invoices')
         .select('*, project:projects(*, customer:customers(*)), customer:customers(*), income(*, bank_account:bank_accounts(*))')
         .eq('org_id', orgId)
+        .is('income.deleted_at', null)
       
       if (!includeDeleted) {
         query = query.is('deleted_at', null)

@@ -171,6 +171,7 @@ export function useVendorLedger(vendorId: string | undefined) {
         .select('*')
         .eq('vendor_id', vendorId)
         .eq('org_id', orgId)
+        .is('deleted_at', null)
 
       if (payError) throw payError
 
