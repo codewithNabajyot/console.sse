@@ -45,7 +45,7 @@ export function useBankTransactions() {
           bank_name: inc.bank_account?.account_name || 'Unknown Bank',
           reference: inc.payment_mode || '',
           payment_mode: inc.payment_mode || undefined,
-          party_name: inc.received_from || undefined
+          party_name: inc.customer?.name || inc.received_from || undefined
         })
       }
     })
