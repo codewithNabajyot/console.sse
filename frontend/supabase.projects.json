@@ -1,0 +1,10 @@
+{
+  "projects": {
+    "qa": {
+      "id":"qhbzrztkvuofkvgyfqdj"
+    },
+    "production": {
+      "id":"qgjdakqkyhbgfmjficjz"
+    }
+  }
+}

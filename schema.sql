@@ -14,6 +14,7 @@ CREATE TABLE organizations (
     gst_number TEXT,
     address TEXT,
     phone TEXT,
+    google_drive_config JSONB DEFAULT '{}'::jsonb,
     notes JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -440,8 +441,16 @@ RETURNS UUID AS $$
   SELECT org_id FROM profiles WHERE id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
 
--- Organizations: Public read access
+-- Organizations: Public read access, Admin update access
 CREATE POLICY "Allow public read organizations" ON organizations FOR SELECT TO authenticated, anon USING (true);
+CREATE POLICY "Admins can update their organization" ON organizations
+    FOR UPDATE USING (
+        id IN (
+            SELECT p.org_id FROM profiles p
+            JOIN org_roles r ON p.role_id = r.id
+            WHERE p.id = auth.uid() AND r.name = 'Admin'
+        )
+    );
 
 -- Profiles: Own record access
 CREATE POLICY "Users can read own profile" ON profiles FOR SELECT TO authenticated USING (auth.uid() = id);
@@ -461,6 +470,9 @@ CREATE POLICY "Users can manage bank accounts" ON bank_accounts FOR ALL TO authe
 CREATE POLICY "Users can manage invoices" ON invoices FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
 CREATE POLICY "Users can manage income" ON income FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
 CREATE POLICY "Users can manage expenses" ON expenses FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
+
+-- Attachments: Org-specific access
+CREATE POLICY "Users can manage attachments" ON attachments FOR ALL TO authenticated USING (org_id = get_user_org_id()) WITH CHECK (org_id = get_user_org_id());
 
 -- 9. COMMENTS FOR DOCUMENTATION
 

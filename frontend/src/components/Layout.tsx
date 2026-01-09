@@ -15,7 +15,8 @@ import {
   Landmark,
   LogOut,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -100,6 +101,7 @@ export const Layout: React.FC = () => {
         { label: 'Bank Statement', href: `/${orgSlug}/stats/bank` },
       ]
     },
+    { label: 'Settings', icon: Settings, href: `/${orgSlug}/settings` },
   ]
 
   const mobileBottomItems = ['Home', 'Projects', 'Quick Add']
@@ -153,6 +155,13 @@ export const Layout: React.FC = () => {
                     )}
                   </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to={`/${orgSlug}/settings`} className="cursor-pointer w-full flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600 cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />

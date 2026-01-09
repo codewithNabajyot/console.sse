@@ -21,6 +21,7 @@ import BankAccounts from './pages/bank-accounts/BankAccounts'
 import BankAccountForm from './pages/bank-accounts/BankAccountForm'
 import GSTSummary from './pages/stats/GSTSummary'
 import BankTransactions from './pages/stats/BankTransactions'
+import OrganizationSettings from './pages/settings/OrganizationSettings'
 import { Layout } from './components/Layout'
 
 import { useAuth } from './contexts/AuthContext'
@@ -73,6 +74,9 @@ function App() {
         {/* Stats */}
         <Route path="stats/gst" element={<GSTSummary />} />
         <Route path="stats/bank" element={<BankTransactions />} />
+
+        {/* Settings */}
+        <Route path="settings" element={<OrganizationSettings />} />
       </Route>
 
       {/* Root redirect to default org or user org */}
