@@ -28,7 +28,7 @@ interface RecordPaymentModalProps {
 export function RecordPaymentModal({ isOpen, onClose, onSuccess, paymentToEdit, initialBill }: RecordPaymentModalProps) {
   const { data: vendors } = useVendors()
   const { data: bankAccounts } = useBankAccounts()
-  const { data: projects } = useProjects()
+  const { data: projects } = useProjects(false, false)
   const { data: paymentModes } = useMasterConfigsByType('PAYMENT_MODE')
   const createPayment = useCreateExpensePayment()
   const updatePayment = useUpdateExpensePayment()

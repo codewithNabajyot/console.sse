@@ -27,7 +27,7 @@ export default function InvoiceForm() {
   const isEditMode = !!id
 
   const { data: invoice, isLoading: isInvoiceLoading } = useInvoiceById(id)
-  const { data: projects, isLoading: isProjectsLoading } = useProjects()
+  const { data: projects, isLoading: isProjectsLoading } = useProjects(false, false)
   const { data: customers, isLoading: isCustomersLoading } = useCustomers()
   
   const createInvoice = useCreateInvoice()

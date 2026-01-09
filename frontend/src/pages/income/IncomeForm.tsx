@@ -32,7 +32,7 @@ export default function IncomeForm() {
   const isEditMode = !!id
 
   const { data: income, isLoading: isIncomeLoading } = useIncomeById(id)
-  const { data: projects, isLoading: isProjectsLoading } = useProjects()
+  const { data: projects, isLoading: isProjectsLoading } = useProjects(false, false)
   const { data: invoices, isLoading: isInvoicesLoading } = useInvoices()
   const { data: customers, isLoading: isCustomersLoading } = useCustomers()
   const { data: bankAccounts, isLoading: isBanksLoading } = useBankAccounts()

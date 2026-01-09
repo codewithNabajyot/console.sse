@@ -4,13 +4,13 @@ import type { Project, ProjectInput } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 
-// Fetch all projects (including optional soft-deleted)
-export function useProjects(includeDeleted = false) {
+// Fetch all projects (including optional soft-deleted and completed)
+export function useProjects(includeDeleted = false, includeCompleted = true) {
   const { profile } = useAuth()
   const orgId = profile?.org_id
 
   return useQuery({
-    queryKey: ['projects', orgId, includeDeleted],
+    queryKey: ['projects', orgId, includeDeleted, includeCompleted],
     queryFn: async () => {
       if (!orgId) throw new Error('Organization ID is required')
       
@@ -23,6 +23,10 @@ export function useProjects(includeDeleted = false) {
       
       if (!includeDeleted) {
         query = query.is('deleted_at', null)
+      }
+
+      if (!includeCompleted) {
+        query = query.neq('status', 'Completed')
       }
 
       const { data, error } = await query.order('created_at', { ascending: false })

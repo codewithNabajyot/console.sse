@@ -37,7 +37,7 @@ export default function ExpenseForm() {
   const preSelectedCategory = queryParams.get('category')
 
   const { data: expense, isLoading: isExpenseLoading } = useExpenseById(id)
-  const { data: projects, isLoading: isProjectsLoading } = useProjects()
+  const { data: projects, isLoading: isProjectsLoading } = useProjects(false, false)
   const { data: vendors, isLoading: isVendorsLoading } = useVendors()
   const { data: bankAccounts, isLoading: isBanksLoading } = useBankAccounts()
   
