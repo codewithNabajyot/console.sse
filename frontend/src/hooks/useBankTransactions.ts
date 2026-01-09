@@ -82,8 +82,8 @@ export function useBankTransactions() {
           bank_account_id: pay.bank_account_id,
           bank_name: pay.bank_account?.account_name || 'Unknown Bank',
           reference: pay.payment_number || '',
-          payment_mode: pay.payment_mode,
-          party_name: pay.vendor?.name
+          payment_mode: pay.payment_mode || undefined,
+          party_name: pay.vendor?.name || undefined
         })
       }
     })
