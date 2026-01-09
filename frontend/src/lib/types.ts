@@ -211,9 +211,10 @@ export interface Invoice {
   updated_at: string
 }
 
-export type InvoiceInput = Omit<Invoice, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'customer' | 'invoice_link'> & { 
+export type InvoiceInput = Omit<Invoice, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'customer' | 'invoice_link' | 'invoice_number'> & { 
   notes?: Note[]
   invoice_link?: string | null 
+  invoice_number?: string
 }
 
 export interface BankTransfer {

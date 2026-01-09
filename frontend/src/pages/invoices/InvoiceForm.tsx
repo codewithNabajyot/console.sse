@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Sparkles } from 'lucide-react'
 import { useInvoiceById, useCreateInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -60,6 +60,29 @@ export default function InvoiceForm() {
       gst_percentage: 5,
     },
   })
+
+  const invoiceDate = watch('date')
+
+  // Predict next invoice number when date or org changes
+  useEffect(() => {
+    async function predictNumber() {
+      if (isEditMode || !profile?.org_id || !invoiceDate) return
+      
+      try {
+        const { data, error } = await supabase.rpc('predict_next_invoice_number', {
+          p_date: invoiceDate,
+          p_org_id: profile.org_id
+        })
+        
+        if (error) throw error
+        if (data) setValue('invoice_number', data)
+      } catch (err) {
+        console.error('Failed to predict invoice number:', err)
+      }
+    }
+    
+    predictNumber()
+  }, [invoiceDate, profile?.org_id, isEditMode, setValue])
 
   // Populate form when editing
   useEffect(() => {
@@ -235,17 +258,21 @@ export default function InvoiceForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="invoice_number">
-                  Invoice Number <span className="text-destructive">*</span>
+                <Label htmlFor="invoice_number" className="flex items-center gap-2">
+                  Invoice Number 
+                  {!isEditMode && (
+                    <span className="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                      <Sparkles className="h-2.5 w-2.5" /> PREDICTED
+                    </span>
+                  )}
                 </Label>
                 <Input
                   id="invoice_number"
-                  {...register('invoice_number', { required: 'Invoice number is required' })}
-                  placeholder="INV-001"
+                  {...register('invoice_number')}
+                  disabled={true}
+                  placeholder="Predicting next number..."
+                  className="bg-muted/30 cursor-not-allowed"
                 />
-                {errors.invoice_number && (
-                  <p className="text-sm text-destructive">{errors.invoice_number.message}</p>
-                )}
               </div>
             </div>
 

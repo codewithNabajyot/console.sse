@@ -268,8 +268,9 @@ CREATE TABLE expenses (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Expense Number Sequence & Trigger
+-- Number Sequences
 CREATE SEQUENCE IF NOT EXISTS expense_number_seq START 1001;
+CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1;
 
 CREATE OR REPLACE FUNCTION assign_expense_number()
 RETURNS TRIGGER AS $$
@@ -284,6 +285,33 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_assign_expense_number
 BEFORE INSERT ON expenses
 FOR EACH ROW EXECUTE FUNCTION assign_expense_number();
+
+-- Invoice Number Trigger Function
+CREATE OR REPLACE FUNCTION generate_invoice_number()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_initials TEXT;
+    v_fy TEXT;
+    v_seq INT;
+BEGIN
+    -- Only generate if it's empty
+    IF NEW.invoice_number IS NULL OR NEW.invoice_number = '' THEN
+        v_initials := get_company_initials(NEW.org_id);
+        v_fy := get_financial_year(NEW.invoice_date);
+        
+        -- Get next unique sequence value
+        v_seq := nextval('invoice_number_seq');
+        
+        NEW.invoice_number := v_initials || '/' || v_fy || '/' || LPAD(v_seq::TEXT, 3, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_generate_invoice_number
+    BEFORE INSERT ON invoices
+    FOR EACH ROW
+    EXECUTE FUNCTION generate_invoice_number();
 
 -- ATTACHMENTS (Google Drive Links)
 CREATE TABLE attachments (
@@ -440,6 +468,61 @@ CREATE OR REPLACE FUNCTION get_user_org_id()
 RETURNS UUID AS $$
   SELECT org_id FROM profiles WHERE id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- Get financial year (e.g., 2425)
+CREATE OR REPLACE FUNCTION get_financial_year(p_date DATE)
+RETURNS TEXT AS $$
+DECLARE
+    v_year INT;
+    v_month INT;
+BEGIN
+    v_year := EXTRACT(YEAR FROM p_date);
+    v_month := EXTRACT(MONTH FROM p_date);
+    
+    -- April to March logic
+    IF v_month < 4 THEN
+        RETURN TO_CHAR((v_year - 1) % 100, 'FM00') || TO_CHAR(v_year % 100, 'FM00');
+    ELSE
+        RETURN TO_CHAR(v_year % 100, 'FM00') || TO_CHAR((v_year + 1) % 100, 'FM00');
+    END IF;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- Get company initials from master_configs
+CREATE OR REPLACE FUNCTION get_company_initials(p_org_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+    v_initials TEXT;
+BEGIN
+    SELECT value INTO v_initials
+    FROM master_configs
+    WHERE org_id = p_org_id AND config_type = 'COMPANY_INITIALS'
+    LIMIT 1;
+    
+    RETURN COALESCE(v_initials, 'INV');
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- Predict next invoice number (Preview for UI)
+CREATE OR REPLACE FUNCTION predict_next_invoice_number(p_date DATE, p_org_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+    v_initials TEXT;
+    v_fy TEXT;
+    v_seq INT;
+BEGIN
+    v_initials := get_company_initials(p_org_id);
+    v_fy := get_financial_year(p_date);
+    
+    BEGIN
+        SELECT last_value + 1 INTO v_seq FROM invoice_number_seq;
+    EXCEPTION WHEN OTHERS THEN
+        v_seq := 1;
+    END;
+    
+    RETURN v_initials || '/' || v_fy || '/' || LPAD(v_seq::TEXT, 3, '0');
+END;
+$$ LANGUAGE plpgsql STABLE;
 
 -- Organizations: Public read access, Admin update access
 CREATE POLICY "Allow public read organizations" ON organizations FOR SELECT TO authenticated, anon USING (true);
