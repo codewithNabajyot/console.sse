@@ -26,6 +26,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { format } from 'date-fns'
 import { MobileTransactionCard } from '@/components/MobileTransactionCard'
+import { ProjectCustomerInfo } from '@/components/shared/ProjectCustomerInfo'
+import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
+import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
 
 type FilterType = 'UNALLOCATED' | 'MONTHLY' | 'TOTAL' | 'ALL'
 
@@ -139,32 +142,16 @@ export default function IncomeList() {
                         {format(new Date(record.date), 'dd MMM yyyy')}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col">
-                          {record.project ? (
-                            <>
-                              <span className="font-mono text-xs font-semibold">{record.project.project_id_code}</span>
-                              <span className="text-sm">{record.project.customer?.name}</span>
-                            </>
-                          ) : record.customer ? (
-                            <span className="text-sm font-medium">{record.customer.name}</span>
-                          ) : (
-                            <span className="text-muted-foreground italic">Common</span>
-                          )}
-                        </div>
+                        <ProjectCustomerInfo project={record.project} customer={record.customer} />
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{record.category || 'N/A'}</Badge>
                       </TableCell>
-                      <TableCell className="font-semibold text-green-600">
-                        ₹{record.amount.toLocaleString('en-IN')}
+                      <TableCell className="py-4">
+                        <AmountGstInfo amount={record.amount} showGst={false} amountClassName="text-green-600" />
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">
-                          {record.bank_account?.account_name}
-                          <div className="text-[10px] text-muted-foreground uppercase font-bold">
-                            {record.payment_mode || 'N/A'} • {record.bank_account?.bank_name}
-                          </div>
-                        </div>
+                        <PaymentMethodInfo bankAccount={record.bank_account} paymentMode={record.payment_mode} />
                       </TableCell>
                       <TableCell>
                         {record.invoice ? (
@@ -246,32 +233,15 @@ export default function IncomeList() {
             fields={[
               { 
                 label: 'Source', 
-                value: (
-                  <div className="flex flex-col items-end">
-                    {record.project ? (
-                      <>
-                        <span className="font-mono text-xs">{record.project.project_id_code}</span>
-                        <span className="text-xs text-muted-foreground">{record.project.customer?.name}</span>
-                      </>
-                    ) : record.customer ? (
-                      <span className="text-xs font-medium">{record.customer.name}</span>
-                    ) : 'Common'}
-                  </div>
-                )
+                value: <ProjectCustomerInfo project={record.project} customer={record.customer} layout="horizontal" className="justify-end" />
               },
               { 
                 label: 'Amount', 
-                value: `₹${record.amount.toLocaleString('en-IN')}`, 
-                className: 'text-green-600 font-bold' 
+                value: <AmountGstInfo amount={record.amount} showGst={false} amountClassName="text-green-600" />, 
               },
               { 
                 label: 'Bank & Method', 
-                value: (
-                  <div className="flex flex-col items-end text-right">
-                    <span>{record.bank_account?.account_name}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase font-bold">{record.payment_mode || 'N/A'}</span>
-                  </div>
-                )
+                value: <PaymentMethodInfo bankAccount={record.bank_account} paymentMode={record.payment_mode} className="items-end" />
               },
               {
                 label: 'Status',

@@ -158,7 +158,7 @@ export function useVendorLedger(vendorId: string | undefined) {
       // Fetch Expenses
       const { data: expenses, error: expError } = await supabase
         .from('expenses')
-        .select('*, project:projects(project_id_code)')
+        .select('*, project:projects(*, customer:customers(*))')
         .eq('vendor_id', vendorId)
         .eq('org_id', orgId)
         .is('deleted_at', null)
@@ -168,7 +168,7 @@ export function useVendorLedger(vendorId: string | undefined) {
       // Fetch Payments
       const { data: payments, error: payError } = await supabase
         .from('expense_payments')
-        .select('*')
+        .select('*, bank_account:bank_accounts(*), project:projects(*, customer:customers(*))')
         .eq('vendor_id', vendorId)
         .eq('org_id', orgId)
         .is('deleted_at', null)
@@ -183,7 +183,7 @@ export function useVendorLedger(vendorId: string | undefined) {
           number: exp.expense_number || 'EXP-???',
           type: 'Bill' as const,
           description: exp.description,
-          project: exp.project?.project_id_code,
+          project: exp.project, // Full project object
           debit: exp.total_paid, // Increases what we owe
           credit: 0
         })),
@@ -193,7 +193,9 @@ export function useVendorLedger(vendorId: string | undefined) {
           number: pay.payment_number || 'VPAY-???',
           type: 'Payment' as const,
           description: `Payment via ${pay.payment_mode || 'Bank'}`,
-          project: '-',
+          project: pay.project, // Full project object if linked
+          bank_account: pay.bank_account,
+          payment_mode: pay.payment_mode,
           debit: 0,
           credit: pay.amount // Decreases what we owe
         }))

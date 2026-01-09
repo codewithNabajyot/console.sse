@@ -16,6 +16,8 @@ export interface BankTransaction {
   bank_account_id: string
   bank_name: string
   reference: string
+  payment_mode?: string
+  party_name?: string
 }
 
 export function useBankTransactions() {
@@ -41,7 +43,9 @@ export function useBankTransactions() {
           amount: inc.amount,
           bank_account_id: inc.bank_account_id,
           bank_name: inc.bank_account?.account_name || 'Unknown Bank',
-          reference: inc.payment_mode || ''
+          reference: inc.payment_mode || '',
+          payment_mode: inc.payment_mode || undefined,
+          party_name: inc.received_from || undefined
         })
       }
     })
@@ -54,11 +58,13 @@ export function useBankTransactions() {
           date: exp.date,
           type: 'expense',
           category: exp.category || 'Direct Expense',
-          description: exp.description || exp.vendor?.name || 'Expense',
+          description: exp.description || 'Expense',
           amount: exp.total_paid,
           bank_account_id: exp.bank_account_id,
           bank_name: exp.bank_account?.account_name || 'Unknown Bank',
-          reference: exp.vendor_invoice_number || ''
+          reference: exp.vendor_invoice_number || '',
+          payment_mode: 'Direct',
+          party_name: exp.vendor?.name
         })
       }
     })
@@ -75,7 +81,9 @@ export function useBankTransactions() {
           amount: pay.amount,
           bank_account_id: pay.bank_account_id,
           bank_name: pay.bank_account?.account_name || 'Unknown Bank',
-          reference: pay.payment_mode || ''
+          reference: pay.payment_number || '',
+          payment_mode: pay.payment_mode,
+          party_name: pay.vendor?.name
         })
       }
     })
@@ -92,7 +100,9 @@ export function useBankTransactions() {
         amount: transfer.amount,
         bank_account_id: transfer.from_account_id,
         bank_name: transfer.from_account?.account_name || 'Unknown Bank',
-        reference: 'TRANSFER-OUT'
+        reference: 'TRANSFER-OUT',
+        payment_mode: 'Transfer',
+        party_name: transfer.to_account?.account_name
       })
 
       // Inflow side
@@ -105,7 +115,9 @@ export function useBankTransactions() {
         amount: transfer.amount,
         bank_account_id: transfer.to_account_id,
         bank_name: transfer.to_account?.account_name || 'Unknown Bank',
-        reference: 'TRANSFER-IN'
+        reference: 'TRANSFER-IN',
+        payment_mode: 'Transfer',
+        party_name: transfer.from_account?.account_name
       })
     })
 

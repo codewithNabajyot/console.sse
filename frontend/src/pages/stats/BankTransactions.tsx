@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils'
 import { ArrowUpRight, ArrowDownRight, Download } from 'lucide-react'
 import { MobileTransactionCard } from '@/components/MobileTransactionCard'
 import { utils, writeFile } from 'xlsx'
+import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
+import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
 
 const BankTransactions: React.FC = () => {
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useBankAccounts()
@@ -108,14 +110,16 @@ const BankTransactions: React.FC = () => {
     ]
 
     // 2. Prepare Transaction Data
-    const transactionHeaders = ['Date', 'Type', 'Category', 'Description', 'Bank', 'Reference', 'Income', 'Expense']
+    const transactionHeaders = ['Date', 'Type', 'Category', 'Description', 'Party', 'Bank Account', 'Payment Method', 'Reference', 'Income', 'Expense']
     
     const transactionData = filteredTransactions.map(tx => [
       format(parseISO(tx.date), 'dd MMM yyyy'),
       tx.type.toUpperCase(),
       tx.category,
       tx.description,
+      tx.party_name || '-',
       tx.bank_name,
+      tx.payment_mode || '-',
       tx.reference,
       tx.type === 'income' ? tx.amount : '',
       tx.type === 'expense' ? tx.amount : ''
@@ -123,7 +127,7 @@ const BankTransactions: React.FC = () => {
 
     // Calculate totals for export
     const totalRow = [
-      'TOTAL', '', '', '', '', '',
+      'TOTAL', '', '', '', '', '', '', '',
       totals.income,
       totals.expense
     ]
@@ -147,7 +151,9 @@ const BankTransactions: React.FC = () => {
       { wch: 10 }, // Type
       { wch: 20 }, // Category
       { wch: 30 }, // Description
+      { wch: 25 }, // Party
       { wch: 20 }, // Bank
+      { wch: 15 }, // Payment Method
       { wch: 15 }, // Reference
       { wch: 12 }, // Income
       { wch: 12 }  // Expense
@@ -294,46 +300,57 @@ const BankTransactions: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Bank</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="w-[120px]">Date</TableHead>
+                  <TableHead>Description & Party</TableHead>
+                  <TableHead>Bank & Method</TableHead>
+                  <TableHead className="text-right w-[140px]">Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                       No transactions found for the selected period.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredTransactions.map((tx) => (
                     <TableRow key={`${tx.type}-${tx.id}`}>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        {format(parseISO(tx.date), 'dd MMM yyyy')}
+                      <TableCell className="font-medium whitespace-nowrap align-top py-3">
+                        <div className="flex flex-col gap-1">
+                          <span>{format(parseISO(tx.date), 'dd MMM yyyy')}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold">{tx.type}</span>
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <span className="text-xs text-muted-foreground">{tx.reference}</span>
+                      <TableCell className="align-top py-3">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{tx.party_name || (tx.type === 'income' ? 'Unknown Payer' : 'Unknown Payee')}</span>
+                            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal">
+                              {tx.category}
+                            </Badge>
+                          </div>
+                          <span className="text-sm text-muted-foreground line-clamp-2">{tx.description}</span>
+                          {tx.reference && tx.reference !== tx.payment_mode && (
+                             <span className="text-xs text-muted-foreground font-mono">Ref: {tx.reference}</span>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider">
-                          {tx.category}
-                        </Badge>
+                      <TableCell className="align-top py-3">
+                        <PaymentMethodInfo 
+                          bankAccount={{ account_name: tx.bank_name || '' }}
+                          paymentMode={tx.payment_mode}
+                          className="items-start"
+                        />
                       </TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {tx.description}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {tx.bank_name}
-                      </TableCell>
-                      <TableCell className={cn(
-                        "text-right font-semibold",
-                        tx.type === 'income' ? "text-green-600" : "text-red-600"
-                      )}>
-                        {tx.type === 'income' ? '+' : '-'} ₹{tx.amount.toLocaleString('en-IN')}
+                      <TableCell className="text-right align-top py-3">
+                        <AmountGstInfo 
+                          amount={tx.amount} 
+                          showGst={false} 
+                          className="items-end"
+                          amountClassName={tx.type === 'income' ? "text-green-600 font-bold" : "text-red-600 font-bold"}
+                          currencySymbol={tx.type === 'income' ? '+' : '-'}
+                        />
                       </TableCell>
                     </TableRow>
                   ))
@@ -355,13 +372,24 @@ const BankTransactions: React.FC = () => {
               </Badge>
             }
             fields={[
-              { label: 'Reference', value: tx.reference },
-              { label: 'Category', value: tx.category },
-              { label: 'Bank', value: tx.bank_name },
+              { label: 'Party', value: tx.party_name || (tx.type === 'income' ? 'Unknown Payer' : 'Unknown Payee') },
+              { label: 'Description', value: (
+                <div className="flex flex-col gap-1">
+                  <span>{tx.description}</span>
+                  <Badge variant="secondary" className="w-fit text-[10px] uppercase font-bold tracking-wider">
+                    {tx.category}
+                  </Badge>
+                </div>
+              )},
+              { label: 'Bank', value: <PaymentMethodInfo bankAccount={{ account_name: tx.bank_name || '' }} paymentMode={tx.payment_mode} className="items-end" /> },
               { 
                 label: 'Amount', 
-                value: `₹${tx.amount.toLocaleString('en-IN')}`, 
-                className: tx.type === 'income' ? 'text-green-600 font-bold' : 'text-red-600 font-bold' 
+                value: <AmountGstInfo 
+                  amount={tx.amount} 
+                  showGst={false} 
+                  amountClassName={tx.type === 'income' ? "text-green-600 font-bold" : "text-red-600 font-bold"}
+                  currencySymbol={tx.type === 'income' ? '+' : '-'}
+                />
               }
             ]}
           />

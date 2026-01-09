@@ -3,8 +3,12 @@ import { format } from 'date-fns'
 import { ArrowLeft, Printer, ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react'
 import { useVendorLedger, useVendor } from '@/hooks/useVendors'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ProjectCustomerInfo } from '@/components/shared/ProjectCustomerInfo'
+import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
+import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
 
 export default function VendorLedger() {
   const { id } = useParams()
@@ -110,16 +114,15 @@ export default function VendorLedger() {
               <TableRow className="print:border-b-2 print:border-black">
                 <TableHead className="w-[100px] print:w-[80px] font-bold print:text-black">Date</TableHead>
                 <TableHead className="w-[140px] print:w-[100px] font-bold print:text-black">Reference</TableHead>
-                <TableHead className="font-bold print:text-black">Description / Project</TableHead>
-                <TableHead className="text-right w-[110px] print:w-[90px] font-bold print:text-black">Debit (Bill)</TableHead>
-                <TableHead className="text-right w-[110px] print:w-[90px] font-bold print:text-black">Credit (Paid)</TableHead>
+                <TableHead className="font-bold print:text-black">Description & Details</TableHead>
+                <TableHead className="text-right w-[140px] print:w-[110px] font-bold print:text-black">Amount</TableHead>
                 <TableHead className="text-right w-[140px] print:w-[110px] font-bold print:text-black">Balance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {ledger?.transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                     No transactions recorded for this vendor.
                   </TableCell>
                 </TableRow>
@@ -132,24 +135,53 @@ export default function VendorLedger() {
                     <TableCell className="print:py-2">
                       <div className="flex flex-col">
                         <span className="font-mono text-[9px] text-muted-foreground uppercase font-bold print:hidden">{t.type}</span>
-                        <span className="font-bold text-xs print:text-[10px]">{t.number}</span>
+                        <span className={cn("font-mono text-[10px] font-bold", t.type === 'Bill' ? "text-blue-600" : "text-blue-600")}>{t.number}</span>
                       </div>
                     </TableCell>
                     <TableCell className="print:py-2">
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold line-clamp-1 print:text-[10px] print:line-clamp-none whitespace-normal">{t.description || '—'}</span>
-                        <span className="text-[11px] text-primary font-bold print:text-black print:text-[9px]">{t.project !== '-' ? t.project : ''}</span>
+                        {t.type === 'Bill' ? (
+                          <>
+                            <span className="text-sm font-semibold line-clamp-1 print:text-[10px] print:line-clamp-none whitespace-normal">{t.description || '—'}</span>
+                            <ProjectCustomerInfo project={t.project} className="print:text-black print:text-[9px]" />
+                          </>
+                        ) : (
+                          <PaymentMethodInfo 
+                            bankAccount={t.bank_account}
+                            paymentMode={t.payment_mode}
+                            className="items-start"
+                          />
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right text-sm font-bold text-red-600/90 print:text-black print:text-[10px] print:py-2">
-                      {t.debit > 0 ? `₹${t.debit.toLocaleString('en-IN')}` : '—'}
+                    <TableCell className="text-right py-4 bg-muted/10">
+                      {t.type === 'Bill' ? (
+                        <AmountGstInfo 
+                          amount={t.debit} 
+                          showGst={false} 
+                          amountClassName="text-red-600 font-bold" 
+                          className="items-end" 
+                          currencySymbol="-"
+                        />
+                      ) : (
+                        <AmountGstInfo 
+                          amount={t.credit} 
+                          showGst={false} 
+                          amountClassName="text-green-600 font-bold" 
+                          className="items-end" 
+                          currencySymbol="+"
+                        />
+                      )}
                     </TableCell>
-                    <TableCell className="text-right text-sm font-bold text-green-600/90 print:text-black print:text-[10px] print:py-2">
-                      {t.credit > 0 ? `₹${t.credit.toLocaleString('en-IN')}` : '—'}
-                    </TableCell>
-                    <TableCell className={`text-right text-sm font-black ${t.balance > 0.1 ? "text-orange-700" : "text-green-700"} print:text-black print:text-[10px] print:py-2`}>
-                      ₹{Math.abs(t.balance).toLocaleString('en-IN')}
-                      <span className="text-[10px] ml-1 font-bold italic opacity-70 print:text-[8px] print:opacity-100">{t.balance > 0.1 ? 'Dr' : 'Cr'}</span>
+                    <TableCell className="text-right py-2">
+                      <AmountGstInfo 
+                        amount={Math.abs(t.balance)} 
+                        showGst={false} 
+                        amountClassName={cn("text-sm font-black", t.balance > 0.1 ? "text-orange-700" : "text-green-700")}
+                        className="items-end"
+                        currencySymbol={`₹`}
+                      />
+                      <span className="text-[10px] font-bold italic opacity-70 print:text-[8px] print:opacity-100">{t.balance > 0.1 ? 'Dr' : 'Cr'}</span>
                     </TableCell>
                   </TableRow>
                 ))

@@ -42,6 +42,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ExpenseStatusBadge } from '@/components/expenses/ExpenseStatusBadge'
 import { Wallet, ReceiptText, CircleDollarSign } from 'lucide-react'
+import { ProjectCustomerInfo } from '@/components/shared/ProjectCustomerInfo'
+import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
+import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
 
 export default function ExpenseList() {
   const { orgSlug } = useParams()
@@ -96,7 +99,9 @@ export default function ExpenseList() {
       bank_account: p.bank_account,
       notes: p.notes,
       type: 'payment' as const,
+      payment_mode: p.payment_mode,
       allocations: p.allocations,
+      project: p.project,
       raw: p
     })) || []
     
@@ -109,7 +114,9 @@ export default function ExpenseList() {
       bank_account: e.bank_account,
       notes: e.notes,
       type: 'expense' as const,
+      payment_mode: null,
       allocations: [],
+      project: e.project,
       raw: e
     })) || []
     
@@ -258,8 +265,8 @@ export default function ExpenseList() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead className="w-[180px]">Bill & Project</TableHead>
                       <TableHead className="w-[120px]">Date</TableHead>
+                      <TableHead className="w-[180px]">Bill & Project</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead className="w-[140px]">Category</TableHead>
                       <TableHead className="w-[120px]">Amount</TableHead>
@@ -279,39 +286,40 @@ export default function ExpenseList() {
                         const allocated = record.allocations?.reduce((sum, a) => sum + a.amount, 0) || 0
                         return (
                             <TableRow key={record.id} className="group hover:bg-muted/30 transition-colors">
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-mono text-[10px] text-muted-foreground">{record.expense_number || '-'}</span>
-                                  {record.project ? (
-                                    <span className="text-xs font-semibold text-primary truncate max-w-[160px]" title={record.project.project_id_code}>
-                                      {record.project.project_id_code}
-                                      {record.project.customer?.name && (
-                                        <span className="block text-[10px] font-normal text-muted-foreground truncate">
-                                          {record.project.customer.name}
-                                        </span>
-                                      )}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground italic">Common</span>
-                                  )}
-                                </div>
-                              </TableCell>
                               <TableCell className="text-sm">
                                 {format(new Date(record.date), 'dd MMM yyyy')}
                               </TableCell>
                               <TableCell>
-                                 <span className="text-sm font-medium line-clamp-1" title={record.description || ''}>
-                                   {record.description || '—'}
-                                 </span>
+                                <div className="flex flex-col">
+                                  <span className="font-mono text-[10px] font-bold text-blue-600">{record.expense_number || '-'}</span>
+                                  <ProjectCustomerInfo project={record.project} />
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium line-clamp-1" title={record.description || ''}>
+                                    {record.description || '—'}
+                                  </span>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium uppercase truncate">
+                                    <span className="font-bold text-primary/80">{record.vendor?.name || 'Unknown Vendor'}</span>
+                                    {record.vendor_invoice_number && (
+                                      <>
+                                        <span>•</span>
+                                        <span>#{record.vendor_invoice_number}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline" className="font-normal text-xs whitespace-nowrap">{record.category || 'N/A'}</Badge>
                               </TableCell>
-                              <TableCell className="font-bold whitespace-nowrap">
-                                <div>₹{record.total_paid.toLocaleString('en-IN')}</div>
-                                <div className="text-[10px] uppercase font-bold text-muted-foreground leading-none mt-1">
-                                  GST {record.gst_percentage}% (₹{record.gst_amount.toLocaleString('en-IN')})
-                                </div>
+                              <TableCell className="py-4">
+                                <AmountGstInfo 
+                                  amount={record.total_paid} 
+                                  gstPercentage={record.gst_percentage} 
+                                  gstAmount={record.gst_amount} 
+                                />
                               </TableCell>
                               <TableCell>
                                  <div className="flex flex-col gap-1">
@@ -390,20 +398,20 @@ export default function ExpenseList() {
               <MobileTransactionCard
                 key={record.id}
                 title={format(new Date(record.date), 'dd MMM yyyy')}
-                badge={<span className="font-mono font-bold text-red-600">{record.expense_number || 'Exp'}</span>}
+                badge={<span className="font-mono font-bold text-blue-600">{record.expense_number || 'Exp'}</span>}
                 fields={[
                   { 
                     label: 'Vendor / Project', 
-                    value: `${record.vendor?.name || '—'} (${record.project?.project_id_code || 'Common'})`
+                    value: (
+                      <div className="flex flex-col items-end text-right">
+                        <span className="font-medium">{record.vendor?.name || '—'}</span>
+                        <ProjectCustomerInfo project={record.project} layout="horizontal" className="justify-end" />
+                      </div>
+                    )
                   },
                   { 
                     label: 'Amount', 
-                    value: (
-                      <div className="flex flex-col items-end">
-                        <span className="font-bold">₹{record.total_paid.toLocaleString('en-IN')}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">GST {record.gst_percentage}%</span>
-                      </div>
-                    )
+                    value: <AmountGstInfo amount={record.total_paid} gstPercentage={record.gst_percentage} layout="horizontal" className="items-end" />
                   },
                   {
                     label: 'Status',
@@ -482,11 +490,12 @@ export default function ExpenseList() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[180px]">Reference & Mode</TableHead>
                       <TableHead className="w-[120px]">Date</TableHead>
+                      <TableHead className="w-[180px]">Reference & Project</TableHead>
                       <TableHead>Vendor</TableHead>
+                      <TableHead className="w-[180px]">Bank & Method</TableHead>
                       <TableHead className="w-[125px] text-right">Amount</TableHead>
-                      <TableHead className="w-[140px]">Links</TableHead>
+                      <TableHead className="w-[140px]">Status</TableHead>
                       <TableHead className="text-right w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -504,24 +513,23 @@ export default function ExpenseList() {
                           
                           return (
                             <TableRow key={`${record.type}-${record.id}`} className="group hover:bg-muted/30 transition-colors">
-                               <TableCell>
-                                 <div className="flex flex-col">
-                                   <div className="flex items-center gap-2">
-                                     <span className="font-mono text-[10px] text-muted-foreground">{record.payment_number || '-'}</span>
-                                     {record.type === 'expense' && (
-                                       <Badge variant="outline" className="text-[9px] h-4 px-1 leading-none uppercase bg-blue-50 text-blue-600 border-blue-200">Direct</Badge>
-                                     )}
-                                   </div>
-                                   <span className="text-xs font-semibold text-primary truncate max-w-[160px]" title={record.bank_account?.account_name}>
-                                     {record.bank_account?.account_name || 'Generic Payment'}
-                                   </span>
-                                 </div>
-                               </TableCell>
                                <TableCell className="text-sm">
                                  {format(new Date(record.date), 'dd MMM yyyy')}
                                </TableCell>
                                <TableCell>
+                                 <div className="flex flex-col">
+                                   <span className="font-mono text-[10px] font-bold text-blue-600">{record.payment_number || '-'}</span>
+                                   <ProjectCustomerInfo project={record.project} />
+                                 </div>
+                               </TableCell>
+                               <TableCell>
                                  <span className="text-sm font-medium">{record.vendor?.name || 'Unknown Vendor'}</span>
+                               </TableCell>
+                               <TableCell>
+                                 <PaymentMethodInfo 
+                                   bankAccount={record.bank_account} 
+                                   paymentMode={record.payment_mode}
+                                 />
                                </TableCell>
                                <TableCell className="text-right font-bold text-red-600/80">
                                  ₹{record.amount.toLocaleString('en-IN')}
@@ -630,21 +638,39 @@ export default function ExpenseList() {
                          </div>
                        }
                        fields={[
-                          { label: 'Vendor / Bank', value: `${record.vendor?.name || 'Unknown'} (${record.bank_account?.account_name || '—'})` },
+                          { label: 'Ref / Project', value: (
+                             <div className="flex flex-col items-end text-right">
+                               <span className="font-mono text-[10px] font-bold text-blue-600">{record.payment_number || '-'}</span>
+                               <ProjectCustomerInfo project={record.project} className="items-end" />
+                             </div>
+                           ) },
+                           { label: 'Vendor / Bank', value: (
+                             <div className="flex flex-col items-end text-right">
+                               <span className="font-medium">{record.vendor?.name || 'Unknown'}</span>
+                              <PaymentMethodInfo 
+                                bankAccount={record.bank_account} 
+                                paymentMode={record.payment_mode}
+                                className="items-end"
+                              />
+                            </div>
+                          ) },
                           { 
-                             label: 'Amount', 
-                             value: `₹${record.amount.toLocaleString('en-IN')}`, 
-                             className: 'font-bold text-red-600' 
-                          },
+                              label: 'Amount', 
+                              value: <AmountGstInfo amount={record.amount} showGst={false} amountClassName="text-red-600" />
+                           },
                           {
                              label: 'Status',
                              value: record.type === 'expense' ? (
                                <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">Settled (Direct)</Badge>
                              ) : (
                                unusedAmount > 0.1 ? (
-                                 <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
-                                   ₹{unusedAmount.toLocaleString('en-IN')} Unused
-                                 </Badge>
+                                 <Badge 
+                                    variant="secondary" 
+                                    className="bg-orange-100 text-orange-800 border-orange-200"
+                                    onClick={() => handleAllocatePayment(record.raw as ExpensePayment)}
+                                  >
+                                    ₹{unusedAmount.toLocaleString('en-IN')} Unused
+                                  </Badge>
                                ) : (
                                  <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">Fully Used</Badge>
                                )

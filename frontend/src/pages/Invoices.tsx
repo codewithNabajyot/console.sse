@@ -14,6 +14,8 @@ import { InvoiceStatsCards } from '@/components/invoices/InvoiceStatsCards'
 import { RecordCollectionModal } from '@/components/invoices/RecordCollectionModal'
 import { AllocateIncomeModal } from '@/components/invoices/AllocateIncomeModal'
 import { PaymentHistoryModal } from '@/components/PaymentHistoryModal'
+import { ProjectCustomerInfo } from '@/components/shared/ProjectCustomerInfo'
+import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
 import {
   Table,
   TableBody,
@@ -154,7 +156,6 @@ export default function Invoices() {
                   <TableHead className="w-[120px]">Date</TableHead>
                   <TableHead>Invoice & Project</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>GST</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Doc</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -178,21 +179,15 @@ export default function Invoices() {
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-mono text-sm font-bold text-blue-600">{inv.invoice_number}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {inv.project?.project_id_code} • {inv.project?.customer?.name || inv.customer?.name}
-                            </span>
+                            <ProjectCustomerInfo project={inv.project} customer={inv.customer} />
                           </div>
                         </TableCell>
-                        <TableCell className="font-bold whitespace-nowrap">
-                          ₹{inv.total_amount.toLocaleString('en-IN')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-[10px] uppercase font-bold text-muted-foreground leading-none mb-1">
-                            GST {inv.gst_percentage}%
-                          </div>
-                          <div className="text-xs font-medium">
-                            ₹{inv.gst_amount.toLocaleString('en-IN')}
-                          </div>
+                        <TableCell className="py-4">
+                          <AmountGstInfo 
+                            amount={inv.total_amount} 
+                            gstPercentage={inv.gst_percentage} 
+                            gstAmount={inv.gst_amount} 
+                          />
                         </TableCell>
                         <TableCell>
                           <InvoiceStatusBadge 
@@ -263,8 +258,8 @@ export default function Invoices() {
             title={format(new Date(inv.date), 'dd MMM yyyy')}
             badge={<span className="font-mono font-bold text-blue-600">{inv.invoice_number}</span>}
             fields={[
-              { label: 'Client / Proj', value: `${inv.project?.customer?.name || inv.customer?.name} (${inv.project?.project_id_code})` },
-              { label: 'Amount', value: `₹${inv.total_amount.toLocaleString('en-IN')}`, className: 'font-bold' },
+              { label: 'Client / Proj', value: <ProjectCustomerInfo project={inv.project} customer={inv.customer} layout="horizontal" /> },
+              { label: 'Amount', value: <AmountGstInfo amount={inv.total_amount} gstPercentage={inv.gst_percentage} layout="horizontal" />, className: 'font-bold' },
               { 
                 label: 'Status', 
                 value: <InvoiceStatusBadge 
