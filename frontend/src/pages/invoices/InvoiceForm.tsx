@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft, Sparkles } from 'lucide-react'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { useInvoiceById, useCreateInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -183,19 +184,15 @@ export default function InvoiceForm() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={handleCancel}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditMode ? 'Edit Invoice' : 'Create Invoice'}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {isEditMode ? 'Update invoice information' : 'Create a new sales invoice'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={isEditMode ? 'Edit Invoice' : 'Create Invoice'}
+        description={isEditMode ? 'Update invoice information' : 'Create a new sales invoice'}
+        startAdornment={
+          <Button variant="ghost" size="icon" onClick={handleCancel}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="pt-6">

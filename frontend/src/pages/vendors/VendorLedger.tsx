@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ProjectCustomerInfo } from '@/components/shared/ProjectCustomerInfo'
 import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
 import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 export default function VendorLedger() {
   const { id } = useParams()
@@ -31,25 +32,21 @@ export default function VendorLedger() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header - Hidden on Print */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-4">
+      <PageHeader
+        title="Vendor Ledger"
+        description={<>Transaction history for <span className="font-semibold text-foreground">{vendor?.name}</span></>}
+        className="print:hidden"
+        startAdornment={
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Vendor Ledger</h1>
-            <p className="text-muted-foreground mt-1">
-              Transaction history for <span className="font-semibold text-foreground">{vendor?.name}</span>
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={handlePrint} className="bg-primary text-primary-foreground">
-            <Printer className="mr-2 h-4 w-4" />
-            Print Ledger
-          </Button>
-        </div>
-      </div>
+        }
+      >
+        <Button onClick={handlePrint} className="bg-primary text-primary-foreground">
+          <Printer className="mr-2 h-4 w-4" />
+          Print Ledger
+        </Button>
+      </PageHeader>
 
       {/* Print-Only Header */}
       <div className="hidden print:block text-center border-b pb-6 mb-6">

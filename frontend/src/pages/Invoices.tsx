@@ -41,6 +41,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import type { Invoice } from '@/lib/types'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 type FilterType = 'OUTSTANDING' | 'SETTLED' | 'MONTHLY' | 'ALL'
 
@@ -102,14 +103,10 @@ export default function Invoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Invoices</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Manage your receivables and billing status
-          </p>
-        </div>
-        <div className="flex gap-2">
+      <PageHeader 
+        title="Invoices" 
+        description="Manage your receivables and billing status"
+      >
           <Button asChild variant="outline">
             <Link to={`/${orgSlug}/income/new`}>
               <Plus className="mr-2 h-3 w-3" />
@@ -122,8 +119,7 @@ export default function Invoices() {
               New Invoice
             </Link>
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       <InvoiceStatsCards 
         invoices={invoices}

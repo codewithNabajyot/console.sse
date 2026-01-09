@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { useProject, useCreateProject, useUpdateProject } from '@/hooks/useProjects'
 import { useCustomers } from '@/hooks/useCustomers'
 import { useMasterConfigsByType } from '@/hooks/useMasterConfigs'
@@ -98,19 +99,16 @@ export default function ProjectForm() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={handleCancel}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditMode ? 'Edit Project' : 'New Project'}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {isEditMode ? 'Update project information' : 'Add a new project to your database'}
-          </p>
-        </div>
-      </div>
+      {/* Header */}
+      <PageHeader
+        title={isEditMode ? 'Edit Project' : 'New Project'}
+        description={isEditMode ? 'Update project information' : 'Add a new project to your database'}
+        startAdornment={
+          <Button variant="ghost" size="icon" onClick={handleCancel}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        }
+      />
 
       {/* Form */}
       <Card>

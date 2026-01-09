@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { useExpenseById, useCreateExpense, useUpdateExpense } from '@/hooks/useExpenses'
 import { useProjects } from '@/hooks/useProjects'
 import { useVendors } from '@/hooks/useVendors'
@@ -173,19 +174,15 @@ export default function ExpenseForm() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={handleCancel}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditMode ? 'Edit Expense' : 'Record Expense'}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {isEditMode ? 'Update expense information' : 'Record a new outgoing payment'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={isEditMode ? 'Edit Expense' : 'Record Expense'}
+        description={isEditMode ? 'Update expense information' : 'Record a new outgoing payment'}
+        startAdornment={
+          <Button variant="ghost" size="icon" onClick={handleCancel}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        }
+      />
 
       <Card>
         <CardContent className="pt-6">

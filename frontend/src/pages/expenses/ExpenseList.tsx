@@ -45,6 +45,7 @@ import { Wallet, ReceiptText, CircleDollarSign } from 'lucide-react'
 import { ProjectCustomerInfo } from '@/components/shared/ProjectCustomerInfo'
 import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
 import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 export default function ExpenseList() {
   const { orgSlug } = useParams()
@@ -188,26 +189,21 @@ export default function ExpenseList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Track and manage bills and payments
-          </p>
-        </div>
-        <div className="flex gap-2">
-           <Button variant="outline" onClick={() => setIsPaymentModalOpen(true)}>
-             <Plus className="mr-2 h-4 w-4" />
-             Record Payment
-           </Button>
-           <Button asChild>
-            <Link to={`/${orgSlug}/expenses/new`}>
-              <Plus className="mr-2 h-4 w-4" />
-              Record Expense
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader 
+        title="Expenses" 
+        description="Track and manage bills and payments"
+      >
+        <Button variant="outline" onClick={() => setIsPaymentModalOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Record Payment
+        </Button>
+        <Button asChild>
+          <Link to={`/${orgSlug}/expenses/new`}>
+            <Plus className="mr-2 h-4 w-4" />
+            Record Expense
+          </Link>
+        </Button>
+      </PageHeader>
 
       <ExpenseStatsCards 
         expenses={expenses} 

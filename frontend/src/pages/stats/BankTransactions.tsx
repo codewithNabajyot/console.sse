@@ -19,6 +19,8 @@ import { utils, writeFile } from 'xlsx'
 import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
 import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
 
+import { PageHeader } from '@/components/shared/PageHeader'
+
 const BankTransactions: React.FC = () => {
   const { data: bankAccounts, isLoading: isLoadingAccounts } = useBankAccounts()
   const { data: transactions, isLoading: isLoadingTransactions } = useBankTransactions()
@@ -175,13 +177,10 @@ const BankTransactions: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bank Statement</h1>
-          <p className="text-muted-foreground mt-1">
-            Track bank-wise income and expenses
-          </p>
-        </div>
+      <PageHeader 
+        title="Bank Statement" 
+        description="Track bank-wise income and expenses"
+      >
         <button
           onClick={handleExport}
           className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
@@ -189,7 +188,7 @@ const BankTransactions: React.FC = () => {
           <Download className="h-4 w-4" />
           Export to Excel
         </button>
-      </div>
+      </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="space-y-1.5">

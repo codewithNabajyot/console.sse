@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 const COLORS = ['#F29342', '#4CA771', '#3B82F6', '#EF4444', '#8B5CF6', '#EC4899']
 
@@ -110,14 +111,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">
-            Business performance insights for {selectedMonthLabel}, {selectedYear}
-          </p>
-        </div>
-        
+      <PageHeader
+        title="Dashboard"
+        description={`Business performance insights for ${selectedMonthLabel}, ${selectedYear}`}
+      >
         <div className="flex items-center gap-3 bg-muted/30 p-2 rounded-xl border border-border/50">
           <Calendar className="h-4 w-4 text-muted-foreground ml-2 hidden sm:block" />
           <div className="flex gap-2">
@@ -161,7 +158,7 @@ export default function Dashboard() {
             </select>
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

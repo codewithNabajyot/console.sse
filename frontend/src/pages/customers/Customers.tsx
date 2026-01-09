@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 export default function Customers() {
   const { orgSlug } = useParams()
@@ -55,20 +56,17 @@ export default function Customers() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your customer database
-          </p>
-        </div>
+      <PageHeader
+        title="Customers"
+        description="Manage your customer database"
+      >
         <Button asChild>
           <Link to={`/${orgSlug}/customers/new`}>
             <Plus className="mr-2 h-4 w-4" />
             Add Customer
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Search */}
       <div className="relative">

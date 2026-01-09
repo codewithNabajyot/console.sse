@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { useBankAccount, useCreateBankAccount, useUpdateBankAccount } from '@/hooks/useBankAccounts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -90,19 +91,15 @@ export default function BankAccountForm() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={handleCancel}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditMode ? 'Edit Bank Account' : 'New Bank Account'}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {isEditMode ? 'Update bank account information' : 'Add a new bank account to track'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={isEditMode ? 'Edit Bank Account' : 'New Bank Account'}
+        description={isEditMode ? 'Update bank account information' : 'Add a new bank account to track'}
+        startAdornment={
+          <Button variant="ghost" size="icon" onClick={handleCancel}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        }
+      />
 
       {/* Current Balance Display (Edit Mode Only) */}
       {isEditMode && bankAccount && (

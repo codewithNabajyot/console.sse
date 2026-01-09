@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { useVendor, useCreateVendor, useUpdateVendor } from '@/hooks/useVendors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -82,19 +83,15 @@ export default function VendorForm() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={handleCancel}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEditMode ? 'Edit Vendor' : 'New Vendor'}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {isEditMode ? 'Update vendor information' : 'Add a new vendor to your database'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={isEditMode ? 'Edit Vendor' : 'New Vendor'}
+        description={isEditMode ? 'Update vendor information' : 'Add a new vendor to your database'}
+        startAdornment={
+          <Button variant="ghost" size="icon" onClick={handleCancel}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        }
+      />
 
       {/* Form */}
       <Card>

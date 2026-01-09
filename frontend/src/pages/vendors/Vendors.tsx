@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 export default function Vendors() {
   const { orgSlug } = useParams()
@@ -54,20 +55,17 @@ export default function Vendors() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Vendors</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your vendor database
-          </p>
-        </div>
+      <PageHeader
+        title="Vendors"
+        description="Manage your vendor database"
+      >
         <Button asChild>
           <Link to={`/${orgSlug}/vendors/new`}>
             <Plus className="mr-2 h-4 w-4" />
             Add Vendor
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Search */}
       <div className="relative">

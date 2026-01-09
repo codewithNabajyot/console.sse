@@ -18,6 +18,7 @@ import { Download, Loader2, Plus } from 'lucide-react'
 import { utils, writeFile } from 'xlsx'
 import { Button } from '@/components/ui/button'
 import { Link, useParams } from 'react-router-dom'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 const GSTSummary: React.FC = () => {
   const { data: invoices, isLoading: isLoadingInvoices } = useInvoices()
@@ -243,43 +244,38 @@ const GSTSummary: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">GST Summary</h1>
-          <p className="text-muted-foreground mt-1">
-            Month-wise Output vs Input GST comparison
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link to={`/${orgSlug}/expenses/new?category=STATUTORY_GST_PAYMENT`}>
-            <Button variant="outline" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Record GST Payment
-            </Button>
-          </Link>
-          <button
-            onClick={handleCAExport}
-            disabled={isExporting}
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+      <PageHeader
+        title="GST Summary"
+        description="Month-wise Output vs Input GST comparison"
+      >
+        <Link to={`/${orgSlug}/expenses/new?category=STATUTORY_GST_PAYMENT`}>
+          <Button variant="outline" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Record GST Payment
+          </Button>
+        </Link>
+        <button
+          onClick={handleCAExport}
+          disabled={isExporting}
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+        >
+          {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Export for CA
+        </button>
+        <div className="w-full sm:w-48">
+          <select 
+            value={selectedFY} 
+            onChange={(e) => setSelectedFY(parseInt(e.target.value))}
+            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus-ring focus:ring-offset-2"
           >
-            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Export for CA
-          </button>
-          <div className="w-full sm:w-48">
-            <select 
-              value={selectedFY} 
-              onChange={(e) => setSelectedFY(parseInt(e.target.value))}
-              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
-              {financialYears.map(year => (
-                <option key={year} value={year}>
-                  FY {year}-{((year + 1) % 100).toString().padStart(2, '0')}
-                </option>
-              ))}
-            </select>
-          </div>
+            {financialYears.map(year => (
+              <option key={year} value={year}>
+                FY {year}-{((year + 1) % 100).toString().padStart(2, '0')}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-green-50/50 dark:bg-green-950/20 border-green-100 dark:border-green-900">

@@ -30,6 +30,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 type FilterType = 'ALL_ACTIVE' | 'BOOKED' | 'IN_PROGRESS' | 'COMPLETED'
 
@@ -102,20 +103,18 @@ export default function Projects() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground mt-1">
-            Track and manage your solar installations
-          </p>
-        </div>
+      {/* Header */}
+      <PageHeader 
+        title="Projects" 
+        description="Track and manage your solar installations"
+      >
         <Button asChild>
           <Link to={`/${orgSlug}/projects/new`}>
             <Plus className="mr-2 h-4 w-4" />
             Add Project
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

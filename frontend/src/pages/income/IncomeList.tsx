@@ -29,6 +29,7 @@ import { MobileTransactionCard } from '@/components/MobileTransactionCard'
 import { ProjectCustomerInfo } from '@/components/shared/ProjectCustomerInfo'
 import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
 import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 type FilterType = 'UNALLOCATED' | 'MONTHLY' | 'TOTAL' | 'ALL'
 
@@ -78,20 +79,17 @@ export default function IncomeList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Income</h1>
-          <p className="text-muted-foreground mt-1">
-            Track and manage incoming payments
-          </p>
-        </div>
+      <PageHeader
+        title="Income"
+        description="Track and manage incoming payments"
+      >
         <Button asChild>
           <Link to={`/${orgSlug}/income/new`}>
             <Plus className="mr-2 h-4 w-4" />
             Record Income
           </Link>
         </Button>
-      </div>
+      </PageHeader>
 
       <IncomeStatsCards 
         income={incomeRecords}

@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { PageHeader } from '@/components/shared/PageHeader'
 
 export default function BankAccounts() {
   const { orgSlug } = useParams()
@@ -66,26 +67,21 @@ export default function BankAccounts() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bank Accounts</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your bank accounts and track balances
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsTransferModalOpen(true)}>
-            <ArrowRightLeft className="mr-2 h-4 w-4" />
-            Transfer Money
-          </Button>
-          <Button asChild>
-            <Link to={`/${orgSlug}/bank-accounts/new`}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Bank Account
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Bank Accounts"
+        description="Manage your bank accounts and track balances"
+      >
+        <Button variant="outline" onClick={() => setIsTransferModalOpen(true)}>
+          <ArrowRightLeft className="mr-2 h-4 w-4" />
+          Transfer Money
+        </Button>
+        <Button asChild>
+          <Link to={`/${orgSlug}/bank-accounts/new`}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Bank Account
+          </Link>
+        </Button>
+      </PageHeader>
 
       {/* Search */}
       <div className="relative">
