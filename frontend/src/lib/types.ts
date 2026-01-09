@@ -7,6 +7,12 @@ export interface Organization {
   gst_number: string | null
   address: string | null
   phone: string | null
+  google_drive_config?: {
+    folder_id?: string
+    enabled?: boolean
+    refresh_token?: string
+    connected_email?: string
+  }
   notes: Note[]
   deleted_at: string | null
   created_at: string
@@ -197,6 +203,7 @@ export interface Invoice {
   gst_amount: number
   total_amount: number
   invoice_link: string | null
+  attachments?: Attachment[]
   notes: Note[]
   income?: Income[]
   deleted_at: string | null
@@ -204,7 +211,10 @@ export interface Invoice {
   updated_at: string
 }
 
-export type InvoiceInput = Omit<Invoice, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'customer'> & { notes?: Note[] }
+export type InvoiceInput = Omit<Invoice, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'notes' | 'project' | 'customer' | 'invoice_link'> & { 
+  notes?: Note[]
+  invoice_link?: string | null 
+}
 
 export interface BankTransfer {
   id: string
@@ -222,3 +232,16 @@ export interface BankTransfer {
 }
 
 export type BankTransferInput = Omit<BankTransfer, 'id' | 'org_id' | 'created_at' | 'updated_at' | 'deleted_at' | 'from_account' | 'to_account'>
+
+export interface Attachment {
+  id: string
+  org_id: string
+  entity_type: string
+  entity_id: string
+  file_name: string
+  file_url: string
+  file_type: string
+  uploaded_by: string
+  created_at: string
+  updated_at: string
+}

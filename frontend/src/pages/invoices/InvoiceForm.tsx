@@ -3,13 +3,19 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { useInvoiceById, useCreateInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 import { useProjects } from '@/hooks/useProjects'
 import { useCustomers } from '@/hooks/useCustomers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import type { InvoiceInput } from '@/lib/types'
+import type { InvoiceInput, Attachment } from '@/lib/types'
+import { FileUpload } from '@/components/FileUpload'
+import { useState } from 'react'
+import { ExternalLink, FileText, Trash2 } from 'lucide-react'
+import { useDeleteAttachment } from '@/hooks/useAttachments'
 
 type FormData = {
   project_id: string
@@ -18,7 +24,6 @@ type FormData = {
   invoice_number: string
   total_amount: number
   gst_percentage: number
-  invoice_link: string
 }
 
 export default function InvoiceForm() {
@@ -30,8 +35,13 @@ export default function InvoiceForm() {
   const { data: projects, isLoading: isProjectsLoading } = useProjects(false, false)
   const { data: customers, isLoading: isCustomersLoading } = useCustomers()
   
+  const { profile } = useAuth()
   const createInvoice = useCreateInvoice()
   const updateInvoice = useUpdateInvoice()
+  
+  const [generatedId] = useState(() => id || crypto.randomUUID())
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const deleteAttachment = useDeleteAttachment()
 
   const {
     register,
@@ -48,7 +58,6 @@ export default function InvoiceForm() {
       invoice_number: '',
       total_amount: 0,
       gst_percentage: 5,
-      invoice_link: '',
     },
   })
 
@@ -62,8 +71,10 @@ export default function InvoiceForm() {
         invoice_number: invoice.invoice_number,
         total_amount: invoice.total_amount,
         gst_percentage: invoice.gst_percentage,
-        invoice_link: invoice.invoice_link || '',
       })
+      if (invoice.attachments) {
+        setAttachments(invoice.attachments)
+      }
     }
   }, [invoice, reset])
 
@@ -98,14 +109,18 @@ export default function InvoiceForm() {
       gst_percentage: gstPct,
       gst_amount: Number(gstAmount.toFixed(2)),
       taxable_value: Number(taxableValue.toFixed(2)),
-      invoice_link: data.invoice_link || null,
     }
 
     try {
       if (isEditMode && id) {
         await updateInvoice.mutateAsync({ id, input })
       } else {
-        await createInvoice.mutateAsync(input)
+        // Use pre-generated ID for creation
+        const { error } = await supabase
+          .from('invoices')
+          .insert([{ ...input, id: generatedId, org_id: profile?.org_id }])
+        
+        if (error) throw error
       }
       navigate(`/${orgSlug}/invoices`)
     } catch (error) {
@@ -287,19 +302,62 @@ export default function InvoiceForm() {
               </div>
             </div>
 
-            {/* Invoice Link (Full Width) */}
-            <div className="space-y-2">
-              <Label htmlFor="invoice_link">Invoice Link (Optional)</Label>
-              <Input
-                id="invoice_link"
-                type="url"
-                {...register('invoice_link')}
-                placeholder="https://drive.google.com/..."
-              />
-              <p className="text-xs text-muted-foreground">
-                Link to invoice document (e.g., Google Drive, Dropbox)
-              </p>
+            {/* Invoice Attachment (New) */}
+            <div className="space-y-4 pt-4 border-t">
+              <Label>Invoice Document (Google Drive)</Label>
+              
+              {attachments.length > 0 ? (
+                <div className="space-y-2">
+                  {attachments.map((att) => (
+                    <div key={att.id} className="flex items-center justify-between p-3 border rounded-xl bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded bg-background flex items-center justify-center border">
+                          <FileText className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="text-sm">
+                          <p className="font-medium truncate max-w-[200px]">{att.file_name}</p>
+                          <p className="text-xs text-muted-foreground">Uploaded to Google Drive</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" asChild>
+                          <a href={att.file_url} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-4 w-4 mr-2" /> View
+                          </a>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete this attachment from Google Drive?')) {
+                              deleteAttachment.mutate({
+                                attachmentId: att.id,
+                                fileUrl: att.file_url,
+                                entityId: generatedId,
+                                entityType: 'invoice'
+                              })
+                              setAttachments(prev => prev.filter(a => a.id !== att.id))
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {attachments.length === 0 && (
+                <FileUpload 
+                  entityType="invoice"
+                  entityId={generatedId}
+                  onUploadComplete={(att) => setAttachments(prev => [...prev, att])}
+                />
+              )}
             </div>
+
 
             {/* Actions */}
             <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">

@@ -14,20 +14,39 @@ export function useInvoices(includeDeleted = false) {
     queryFn: async () => {
       if (!orgId) throw new Error('Organization ID is required')
       
-      let query = supabase
+      // Fetch invoices
+      let invoicesQuery = supabase
         .from('invoices')
         .select('*, project:projects(*, customer:customers(*)), customer:customers(*), income(*, bank_account:bank_accounts(*))')
         .eq('org_id', orgId)
         .is('income.deleted_at', null)
       
       if (!includeDeleted) {
-        query = query.is('deleted_at', null)
+        invoicesQuery = invoicesQuery.is('deleted_at', null)
       }
 
-      const { data, error } = await query.order('date', { ascending: false })
+      const { data: invoices, error: invError } = await invoicesQuery.order('date', { ascending: false })
+      if (invError) throw invError
 
-      if (error) throw error
-      return data as Invoice[]
+      // Fetch attachments for these invoices
+      const invoiceIds = invoices?.map(inv => inv.id) || []
+      if (invoiceIds.length > 0) {
+        const { data: attachments, error: attachError } = await supabase
+          .from('attachments')
+          .select('*')
+          .eq('entity_type', 'invoice')
+          .in('entity_id', invoiceIds)
+          .is('deleted_at', null)
+
+        if (!attachError && attachments) {
+          return invoices.map(inv => ({
+            ...inv,
+            attachments: attachments.filter(a => a.entity_id === inv.id)
+          })) as Invoice[]
+        }
+      }
+
+      return invoices as Invoice[]
     },
     enabled: !!orgId,
   })
@@ -44,7 +63,7 @@ export function useInvoiceById(id: string | undefined) {
       if (!id) throw new Error('Invoice ID is required')
       if (!orgId) throw new Error('Organization ID is required')
       
-      const { data, error } = await supabase
+      const { data: invoice, error: invError } = await supabase
         .from('invoices')
         .select('*, project:projects(*, customer:customers(*)), customer:customers(*)')
         .eq('id', id)
@@ -52,8 +71,21 @@ export function useInvoiceById(id: string | undefined) {
         .is('deleted_at', null)
         .single()
 
-      if (error) throw error
-      return data as Invoice
+      if (invError) throw invError
+
+      // Fetch attachments for this invoice
+      const { data: attachments, error: attachError } = await supabase
+        .from('attachments')
+        .select('*')
+        .eq('entity_type', 'invoice')
+        .eq('entity_id', id)
+        .is('deleted_at', null)
+
+      if (!attachError && attachments) {
+        return { ...invoice, attachments } as Invoice
+      }
+
+      return invoice as Invoice
     },
     enabled: !!id && !!orgId,
   })
@@ -129,6 +161,45 @@ export function useDeleteInvoice() {
     mutationFn: async (id: string) => {
       if (!orgId) throw new Error('Organization ID is required')
       
+      // 1. Fetch attachments first to delete from Drive
+      const { data: attachments } = await supabase
+        .from('attachments')
+        .select('*')
+        .eq('entity_type', 'invoice')
+        .eq('entity_id', id)
+        .is('deleted_at', null)
+
+      if (attachments && attachments.length > 0) {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        for (const attachment of attachments) {
+          const fileIdMatch = attachment.file_url.match(/\/d\/(.+?)\//)
+          const fileId = fileIdMatch ? fileIdMatch[1] : null
+
+          if (fileId) {
+            try {
+              await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-from-drive`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session?.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ fileId }),
+              })
+            } catch (e) {
+              console.warn('Failed to delete attachment from drive during invoice deletion', e)
+            }
+          }
+        }
+
+        // Soft delete attachments
+        await supabase
+          .from('attachments')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('entity_type', 'invoice')
+          .eq('entity_id', id)
+      }
+
       const { data, error } = await supabase
         .from('invoices')
         .update({ deleted_at: new Date().toISOString() })
@@ -142,7 +213,7 @@ export function useDeleteInvoice() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', orgId] })
-      toast.success('Invoice deleted successfully')
+      toast.success('Invoice and its Drive attachments deleted successfully')
     },
     onError: (error: Error) => {
       toast.error('Failed to delete invoice', error.message)
