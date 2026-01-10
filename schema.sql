@@ -297,7 +297,7 @@ BEGIN
     -- Only generate if it's empty
     IF NEW.invoice_number IS NULL OR NEW.invoice_number = '' THEN
         v_initials := get_company_initials(NEW.org_id);
-        v_fy := get_financial_year(NEW.invoice_date);
+        v_fy := get_financial_year(NEW.date);
         
         -- Get next unique sequence value
         v_seq := nextval('invoice_number_seq');
@@ -510,12 +510,24 @@ DECLARE
     v_initials TEXT;
     v_fy TEXT;
     v_seq INT;
+    v_last_value BIGINT;
+    v_is_called BOOLEAN;
 BEGIN
     v_initials := get_company_initials(p_org_id);
     v_fy := get_financial_year(p_date);
     
     BEGIN
-        SELECT last_value + 1 INTO v_seq FROM invoice_number_seq;
+        -- Get both last_value and is_called to determine the next value correctly
+        SELECT last_value, is_called INTO v_last_value, v_is_called 
+        FROM invoice_number_seq;
+        
+        -- If the sequence has never been called, the next value will be last_value (which is the start value)
+        -- If it has been called, the next value will be last_value + 1
+        IF v_is_called THEN
+            v_seq := v_last_value + 1;
+        ELSE
+            v_seq := v_last_value;
+        END IF;
     EXCEPTION WHEN OTHERS THEN
         v_seq := 1;
     END;

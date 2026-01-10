@@ -11,9 +11,15 @@ interface FileUploadProps {
   onUploadComplete?: (attachment: any) => void
   label?: string
   className?: string
+  // Optional metadata for better file naming (used when entity doesn't exist in DB yet)
+  metadata?: {
+    invoiceNumber?: string
+    customerName?: string
+    projectCode?: string
+  }
 }
 
-export function FileUpload({ entityType, entityId, onUploadComplete, label, className }: FileUploadProps) {
+export function FileUpload({ entityType, entityId, onUploadComplete, label, className, metadata }: FileUploadProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [filename, setFilename] = useState<string | null>(null)
@@ -42,6 +48,11 @@ export function FileUpload({ entityType, entityId, onUploadComplete, label, clas
       formData.append('file', file)
       formData.append('entity_type', entityType)
       if (entityId) formData.append('entity_id', entityId)
+      
+      // Pass metadata if provided
+      if (metadata?.invoiceNumber) formData.append('invoice_number', metadata.invoiceNumber)
+      if (metadata?.customerName) formData.append('customer_name', metadata.customerName)
+      if (metadata?.projectCode) formData.append('project_code', metadata.projectCode)
 
       const { data, error } = await supabase.functions.invoke('upload-to-drive', {
         body: formData,

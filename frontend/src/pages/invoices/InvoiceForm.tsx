@@ -378,6 +378,11 @@ export default function InvoiceForm() {
                   entityType="invoice"
                   entityId={generatedId}
                   onUploadComplete={(att) => setAttachments(prev => [...prev, att])}
+                  metadata={{
+                    invoiceNumber: watch('invoice_number'),
+                    customerName: customers?.find(c => c.id === watch('customer_id'))?.name,
+                    projectCode: projects?.find(p => p.id === watch('project_id'))?.project_id_code
+                  }}
                 />
               )}
             </div>

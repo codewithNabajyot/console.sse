@@ -50,49 +50,57 @@ serve(async (req) => {
     const file = formData.get('file') as File
     const entityType = formData.get('entity_type') as string
     const entityId = formData.get('entity_id') as string
+    
+    // Get metadata from FormData (if provided by frontend)
+    const invoiceNumber = formData.get('invoice_number') as string | null
+    const customerNameFromForm = formData.get('customer_name') as string | null
+    const projectCodeFromForm = formData.get('project_code') as string | null
 
     if (!file) throw new Error('No file uploaded')
 
     // 1. Fetch metadata for folder/file naming
-    let projectCode = 'GENERAL'
-    let customerName = 'UNKNOWN'
+    let projectCode = projectCodeFromForm || 'GENERAL'
+    let customerName = customerNameFromForm || 'UNKNOWN'
     let targetProjectId = ''
 
-    if (entityType === 'invoice') {
-      const { data: inv } = await supabaseClient
-        .from('invoices')
-        .select('project_id, projects(project_id_code, customers(name)), customers(name)')
-        .eq('id', entityId)
-        .single()
-      
-      if (inv) {
-        targetProjectId = inv.project_id
-        customerName = inv.projects?.customers?.name || inv.customers?.name || 'UNKNOWN'
-        projectCode = inv.projects?.project_id_code || 'GENERAL'
-      }
-    } else if (entityType === 'expense') {
-      const { data: exp } = await supabaseClient
-        .from('expenses')
-        .select('project_id, projects(project_id_code, customers(name))')
-        .eq('id', entityId)
-        .single()
-      
-      if (exp) {
-        targetProjectId = exp.project_id
-        customerName = exp.projects?.customers?.name || 'VENDOR'
-        projectCode = exp.projects?.project_id_code || 'GENERAL'
-      }
-    } else if (entityType === 'project') {
-      const { data: proj } = await supabaseClient
-        .from('projects')
-        .select('project_id_code, customers(name)')
-        .eq('id', entityId)
-        .single()
-      
-      if (proj) {
-        targetProjectId = entityId
-        customerName = proj.customers?.name || 'UNKNOWN'
-        projectCode = proj.project_id_code || 'GENERAL'
+    // Only query database if metadata wasn't provided from frontend
+    if (!customerNameFromForm || !projectCodeFromForm) {
+      if (entityType === 'invoice') {
+        const { data: inv } = await supabaseClient
+          .from('invoices')
+          .select('project_id, projects(project_id_code, customers(name)), customers(name)')
+          .eq('id', entityId)
+          .single()
+        
+        if (inv) {
+          targetProjectId = inv.project_id
+          customerName = customerNameFromForm || inv.projects?.customers?.name || inv.customers?.name || 'UNKNOWN'
+          projectCode = projectCodeFromForm || inv.projects?.project_id_code || 'GENERAL'
+        }
+      } else if (entityType === 'expense') {
+        const { data: exp } = await supabaseClient
+          .from('expenses')
+          .select('project_id, projects(project_id_code, customers(name))')
+          .eq('id', entityId)
+          .single()
+        
+        if (exp) {
+          targetProjectId = exp.project_id
+          customerName = exp.projects?.customers?.name || 'VENDOR'
+          projectCode = exp.projects?.project_id_code || 'GENERAL'
+        }
+      } else if (entityType === 'project') {
+        const { data: proj } = await supabaseClient
+          .from('projects')
+          .select('project_id_code, customers(name)')
+          .eq('id', entityId)
+          .single()
+        
+        if (proj) {
+          targetProjectId = entityId
+          customerName = proj.customers?.name || 'UNKNOWN'
+          projectCode = proj.project_id_code || 'GENERAL'
+        }
       }
     }
 
@@ -149,12 +157,21 @@ serve(async (req) => {
       subfolderId = newFolder.id
     }
 
-    // 3. Custom File Naming: "INVOICE_<CustomerName>_<DateTime>.<ext>"
-    const now = new Date().toISOString().replace(/[:.]/g, '-')
+    // 3. Custom File Naming: "INVOICE_<InvoiceNumber>_<CustomerName>.<ext>" or fallback to timestamp
     const ext = file.name.split('.').pop()
-    const finalFileName = entityType === 'invoice' 
-      ? `INVOICE_${customerName}_${now}.${ext}`
-      : file.name
+    let finalFileName = file.name
+    
+    if (entityType === 'invoice') {
+      if (invoiceNumber) {
+        // Use invoice number if provided (e.g., "INVOICE_SSE-2526-001_CustomerName.pdf")
+        const cleanInvoiceNum = invoiceNumber.replace(/\//g, '-')
+        finalFileName = `INVOICE_${cleanInvoiceNum}_${customerName}.${ext}`
+      } else {
+        // Fallback to timestamp-based naming
+        const now = new Date().toISOString().replace(/[:.]/g, '-')
+        finalFileName = `INVOICE_${customerName}_${now}.${ext}`
+      }
+    }
 
     // Upload to Google Drive
     const uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true'
