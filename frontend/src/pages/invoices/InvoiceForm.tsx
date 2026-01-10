@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useInvoiceById, useCreateInvoice, useUpdateInvoice } from '@/hooks/useInvoices'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useProjects } from '@/hooks/useProjects'
 import { useCustomers } from '@/hooks/useCustomers'
+import { useMasterConfigsByType } from '@/hooks/useMasterConfigs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -62,37 +63,49 @@ export default function InvoiceForm() {
     },
   })
 
+  const { data: initialsConfigs } = useMasterConfigsByType('COMPANY_INITIALS')
+  const companyInitials = initialsConfigs?.[0]?.value || 'INV'
   const invoiceDate = watch('date')
 
-  // Predict next invoice number when date or org changes
-  useEffect(() => {
-    async function predictNumber() {
-      if (isEditMode || !profile?.org_id || !invoiceDate) return
-      
-      try {
-        const { data, error } = await supabase.rpc('predict_next_invoice_number', {
-          p_date: invoiceDate,
-          p_org_id: profile.org_id
-        })
-        
-        if (error) throw error
-        if (data) setValue('invoice_number', data)
-      } catch (err) {
-        console.error('Failed to predict invoice number:', err)
-      }
+  const getFinancialYear = (dateStr: string) => {
+    if (!dateStr) return 'XXXX'
+    const date = new Date(dateStr)
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    if (month < 4) {
+      const start = (year - 1).toString().slice(-2)
+      const end = year.toString().slice(-2)
+      return `${start}${end}`
+    } else {
+      const start = year.toString().slice(-2)
+      const end = (year + 1).toString().slice(-2)
+      return `${start}${end}`
     }
-    
-    predictNumber()
-  }, [invoiceDate, profile?.org_id, isEditMode, setValue])
+  }
+
+  const fy = getFinancialYear(invoiceDate)
+  const prefix = `${companyInitials}/${fy}/`
+
+
 
   // Populate form when editing
   useEffect(() => {
     if (invoice) {
+      let invNum = invoice.invoice_number
+      // If the number starts with the current prefix, we might want to strip it for the input
+      // However, it's safer to just show the input and let the user decide if they want to override
+      // But since we are adding a visual prefix, it might be double.
+      // Let's check if the invoice number already has the prefix format
+      const prefixPattern = /^[A-Z]+\/\d{4}\//
+      if (prefixPattern.test(invNum)) {
+        invNum = invNum.replace(prefixPattern, '')
+      }
+
       reset({
         project_id: invoice.project_id || '',
         customer_id: invoice.customer_id || '',
         date: invoice.date,
-        invoice_number: invoice.invoice_number,
+        invoice_number: invNum,
         total_amount: invoice.total_amount,
         gst_percentage: invoice.gst_percentage,
       })
@@ -124,11 +137,17 @@ export default function InvoiceForm() {
     const gstAmount = totalAmount * (gstPct / (100 + gstPct))
     const taxableValue = totalAmount - gstAmount
 
+    // Prepend prefix if it's not already a full number
+    let finalInvoiceNumber = data.invoice_number
+    if (!/^[A-Z]+\/\d{4}\//.test(finalInvoiceNumber)) {
+      finalInvoiceNumber = `${prefix}${finalInvoiceNumber}`
+    }
+
     const input: InvoiceInput = {
       project_id: data.project_id || null,
       customer_id: data.customer_id || null,
       date: data.date,
-      invoice_number: data.invoice_number,
+      invoice_number: finalInvoiceNumber,
       total_amount: totalAmount,
       gst_percentage: gstPct,
       gst_amount: Number(gstAmount.toFixed(2)),
@@ -255,21 +274,23 @@ export default function InvoiceForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="invoice_number" className="flex items-center gap-2">
-                  Invoice Number 
-                  {!isEditMode && (
-                    <span className="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
-                      <Sparkles className="h-2.5 w-2.5" /> PREDICTED
-                    </span>
-                  )}
+                <Label htmlFor="invoice_number">
+                  Invoice Number <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id="invoice_number"
-                  {...register('invoice_number')}
-                  disabled={true}
-                  placeholder="Predicting next number..."
-                  className="bg-muted/30 cursor-not-allowed"
-                />
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm font-medium">
+                    {prefix}
+                  </span>
+                  <Input
+                    id="invoice_number"
+                    {...register('invoice_number', { required: 'Invoice number is required' })}
+                    placeholder="e.g. 001"
+                    className="rounded-l-none"
+                  />
+                </div>
+                {errors.invoice_number && (
+                  <p className="text-sm text-destructive">{errors.invoice_number.message}</p>
+                )}
               </div>
             </div>
 
