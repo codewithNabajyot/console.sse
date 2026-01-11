@@ -104,6 +104,7 @@ export default function BankAccounts() {
                   <TableHead>Account Name</TableHead>
                   <TableHead>Bank Name</TableHead>
                   <TableHead>Account Number</TableHead>
+                  <TableHead className="text-right">Opening Balance</TableHead>
                   <TableHead className="text-right">Current Balance</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -121,6 +122,7 @@ export default function BankAccounts() {
                       <TableCell className="font-medium">{account.account_name}</TableCell>
                       <TableCell>{account.bank_name || '—'}</TableCell>
                       <TableCell>{account.account_number || '—'}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(account.opening_balance)}</TableCell>
                       <TableCell className="text-right">
                         <Badge variant={account.current_balance >= 0 ? 'success' : 'destructive'}>
                           {formatCurrency(account.current_balance)}
@@ -257,7 +259,11 @@ export default function BankAccounts() {
                   </div>
                 )}
                 <div>
-                  <span className="text-muted-foreground">Balance:</span>{' '}
+                  <span className="text-muted-foreground">Opening Balance:</span>{' '}
+                  <span className="font-medium">{formatCurrency(account.opening_balance)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Current Balance:</span>{' '}
                   <Badge variant={account.current_balance >= 0 ? 'success' : 'destructive'}>
                     {formatCurrency(account.current_balance)}
                   </Badge>

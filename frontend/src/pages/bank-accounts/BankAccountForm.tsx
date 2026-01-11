@@ -14,6 +14,7 @@ type FormData = {
   account_name: string
   bank_name: string
   account_number: string
+  opening_balance: number
 }
 
 export default function BankAccountForm() {
@@ -35,6 +36,7 @@ export default function BankAccountForm() {
       account_name: '',
       bank_name: '',
       account_number: '',
+      opening_balance: 0,
     },
   })
 
@@ -45,6 +47,7 @@ export default function BankAccountForm() {
         account_name: bankAccount.account_name,
         bank_name: bankAccount.bank_name || '',
         account_number: bankAccount.account_number || '',
+        opening_balance: bankAccount.opening_balance || 0,
       })
     }
   }, [bankAccount, reset])
@@ -54,6 +57,7 @@ export default function BankAccountForm() {
       account_name: data.account_name,
       bank_name: data.bank_name || null,
       account_number: data.account_number || null,
+      opening_balance: Number(data.opening_balance),
     }
 
     try {
@@ -157,6 +161,20 @@ export default function BankAccountForm() {
                 id="account_number"
                 {...register('account_number')}
                 placeholder="Enter account number"
+              />
+            </div>
+
+            {/* Opening Balance */}
+            <div className="space-y-2">
+              <Label htmlFor="opening_balance">
+                Opening Balance <span className="text-xs text-muted-foreground ml-1">(Used as starting point for calculations)</span>
+              </Label>
+              <Input
+                id="opening_balance"
+                type="number"
+                step="0.01"
+                {...register('opening_balance')}
+                placeholder="0.00"
               />
             </div>
 

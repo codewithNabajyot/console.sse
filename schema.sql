@@ -92,6 +92,7 @@ CREATE TABLE bank_accounts (
     account_name TEXT NOT NULL,
     bank_name TEXT,
     account_number TEXT,
+    opening_balance NUMERIC(15, 2) DEFAULT 0, -- Initial balance
     current_balance NUMERIC(15, 2) DEFAULT 0, -- Cached real-time balance
     notes JSONB DEFAULT '[]'::jsonb,
     deleted_at TIMESTAMPTZ,
@@ -108,28 +109,48 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_bank_id UUID;
     v_amount NUMERIC;
+    v_is_deleted BOOLEAN;
+    v_was_deleted BOOLEAN;
 BEGIN
+    v_is_deleted := (NEW.deleted_at IS NOT NULL);
+    v_was_deleted := (OLD.deleted_at IS NOT NULL);
+
     IF (TG_OP = 'INSERT') THEN
-        v_bank_id := NEW.bank_account_id;
-        v_amount := NEW.amount;
-    ELSIF (TG_OP = 'UPDATE') THEN
-        IF (OLD.bank_account_id != NEW.bank_account_id) THEN
-            -- Deduct from old bank
-            UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.bank_account_id;
-            -- Add to new bank
+        IF NOT v_is_deleted THEN
             v_bank_id := NEW.bank_account_id;
             v_amount := NEW.amount;
-        ELSE
+        END IF;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        -- Handle soft delete/restore
+        IF NOT v_was_deleted AND v_is_deleted THEN
+            -- Record was deleted: reverse its effect
+            UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.bank_account_id;
+        ELSIF v_was_deleted AND NOT v_is_deleted THEN
+            -- Record was restored: apply its effect
             v_bank_id := NEW.bank_account_id;
-            v_amount := NEW.amount - OLD.amount;
+            v_amount := NEW.amount;
+        ELSIF NOT v_is_deleted THEN
+            -- Normal update on non-deleted record
+            IF (OLD.bank_account_id != NEW.bank_account_id) THEN
+                -- Deduct from old bank
+                UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.bank_account_id;
+                -- Add to new bank
+                v_bank_id := NEW.bank_account_id;
+                v_amount := NEW.amount;
+            ELSE
+                v_bank_id := NEW.bank_account_id;
+                v_amount := NEW.amount - OLD.amount;
+            END IF;
         END IF;
     ELSIF (TG_OP = 'DELETE') THEN
-        v_bank_id := OLD.bank_account_id;
-        v_amount := -OLD.amount;
+        IF NOT v_was_deleted THEN
+            v_bank_id := OLD.bank_account_id;
+            v_amount := -OLD.amount;
+        END IF;
     END IF;
 
     IF v_bank_id IS NOT NULL THEN
-        UPDATE bank_accounts SET current_balance = current_balance + v_amount WHERE id = v_bank_id;
+        UPDATE bank_accounts SET current_balance = current_balance + COALESCE(v_amount, 0) WHERE id = v_bank_id;
     END IF;
     RETURN NULL;
 END;
@@ -141,46 +162,66 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_bank_id UUID;
     v_amount NUMERIC;
+    v_is_deleted BOOLEAN;
+    v_was_deleted BOOLEAN;
 BEGIN
+    v_is_deleted := (NEW.deleted_at IS NOT NULL);
+    v_was_deleted := (OLD.deleted_at IS NOT NULL);
+
     IF (TG_OP = 'INSERT') THEN
-        IF NEW.bank_account_id IS NOT NULL THEN
+        IF NOT v_is_deleted AND NEW.bank_account_id IS NOT NULL THEN
             v_bank_id := NEW.bank_account_id;
             v_amount := -NEW.total_paid;
         END IF;
     ELSIF (TG_OP = 'UPDATE') THEN
-        -- Case 1: Was unpaid (NULL), now Paid (Not NULL)
-        IF OLD.bank_account_id IS NULL AND NEW.bank_account_id IS NOT NULL THEN
-            v_bank_id := NEW.bank_account_id;
-            v_amount := -NEW.total_paid;
-        
-        -- Case 2: Was Paid (Not NULL), now Unpaid (NULL)
-        ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NULL THEN
-            -- Refund the old bank
-            UPDATE bank_accounts SET current_balance = current_balance + OLD.total_paid WHERE id = OLD.bank_account_id;
+        -- Handle soft delete/restore
+        IF NOT v_was_deleted AND v_is_deleted THEN
+            -- Record was deleted: refund the old bank
+            IF OLD.bank_account_id IS NOT NULL THEN
+                UPDATE bank_accounts SET current_balance = current_balance + OLD.total_paid WHERE id = OLD.bank_account_id;
+            END IF;
+        ELSIF v_was_deleted AND NOT v_is_deleted THEN
+            -- Record was restored: apply its effect
+            IF NEW.bank_account_id IS NOT NULL THEN
+                v_bank_id := NEW.bank_account_id;
+                v_amount := -NEW.total_paid;
+            END IF;
+        ELSIF NOT v_is_deleted THEN
+            -- Normal update on non-deleted record
+            -- Case 1: Was unpaid (NULL), now Paid (Not NULL)
+            IF OLD.bank_account_id IS NULL AND NEW.bank_account_id IS NOT NULL THEN
+                v_bank_id := NEW.bank_account_id;
+                v_amount := -NEW.total_paid;
             
-        -- Case 3: Changed Bank (Both Not NULL)
-        ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NOT NULL AND OLD.bank_account_id != NEW.bank_account_id THEN
-            -- Add back to old bank
-            UPDATE bank_accounts SET current_balance = current_balance + OLD.total_paid WHERE id = OLD.bank_account_id;
-            -- Deduct from new bank
-            v_bank_id := NEW.bank_account_id;
-            v_amount := -NEW.total_paid;
+            -- Case 2: Was Paid (Not NULL), now Unpaid (NULL)
+            ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NULL THEN
+                -- Refund the old bank
+                UPDATE bank_accounts SET current_balance = current_balance + OLD.total_paid WHERE id = OLD.bank_account_id;
+                
+            -- Case 3: Changed Bank (Both Not NULL)
+            ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NOT NULL AND OLD.bank_account_id != NEW.bank_account_id THEN
+                -- Add back to old bank
+                UPDATE bank_accounts SET current_balance = current_balance + OLD.total_paid WHERE id = OLD.bank_account_id;
+                -- Deduct from new bank
+                v_bank_id := NEW.bank_account_id;
+                v_amount := -NEW.total_paid;
 
-        -- Case 4: Same Bank, maybe Changed Amount
-        ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NOT NULL THEN
-            v_bank_id := NEW.bank_account_id;
-            v_amount := -(NEW.total_paid - OLD.total_paid);
+            -- Case 4: Same Bank, maybe Changed Amount
+            ELSIF OLD.bank_account_id IS NOT NULL AND NEW.bank_account_id IS NOT NULL THEN
+                v_bank_id := NEW.bank_account_id;
+                v_amount := -(NEW.total_paid - OLD.total_paid);
+            END IF;
         END IF;
 
     ELSIF (TG_OP = 'DELETE') THEN
-        IF OLD.bank_account_id IS NOT NULL THEN
+        IF NOT v_was_deleted AND OLD.bank_account_id IS NOT NULL THEN
             v_bank_id := OLD.bank_account_id;
             v_amount := OLD.total_paid;
         END IF;
     END IF;
 
     IF v_bank_id IS NOT NULL THEN
-        UPDATE bank_accounts SET current_balance = current_balance + v_amount WHERE id = v_bank_id;
+        UPDATE bank_accounts SET current_balance = current_balance + COALESCE(v_amount, 0) WHERE id = v_bank_id;
     END IF;
     RETURN NULL;
 END;
@@ -552,28 +593,48 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_bank_id UUID;
     v_amount NUMERIC;
+    v_is_deleted BOOLEAN;
+    v_was_deleted BOOLEAN;
 BEGIN
+    v_is_deleted := (NEW.deleted_at IS NOT NULL);
+    v_was_deleted := (OLD.deleted_at IS NOT NULL);
+
     IF (TG_OP = 'INSERT') THEN
-        v_bank_id := NEW.bank_account_id;
-        v_amount := -NEW.amount;
-    ELSIF (TG_OP = 'UPDATE') THEN
-        IF (OLD.bank_account_id != NEW.bank_account_id) THEN
-            -- Add back to old bank
-            UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.bank_account_id;
-            -- Deduct from new bank
+        IF NOT v_is_deleted THEN
             v_bank_id := NEW.bank_account_id;
             v_amount := -NEW.amount;
-        ELSE
+        END IF;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        -- Handle soft delete/restore
+        IF NOT v_was_deleted AND v_is_deleted THEN
+            -- Record was deleted: add back to old bank
+            UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.bank_account_id;
+        ELSIF v_was_deleted AND NOT v_is_deleted THEN
+            -- Record was restored: deduct from new bank
             v_bank_id := NEW.bank_account_id;
-            v_amount := -(NEW.amount - OLD.amount);
+            v_amount := -NEW.amount;
+        ELSIF NOT v_is_deleted THEN
+            -- Normal update on non-deleted record
+            IF (OLD.bank_account_id != NEW.bank_account_id) THEN
+                -- Add back to old bank
+                UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.bank_account_id;
+                -- Deduct from new bank
+                v_bank_id := NEW.bank_account_id;
+                v_amount := -NEW.amount;
+            ELSE
+                v_bank_id := NEW.bank_account_id;
+                v_amount := -(NEW.amount - OLD.amount);
+            END IF;
         END IF;
     ELSIF (TG_OP = 'DELETE') THEN
-        v_bank_id := OLD.bank_account_id;
-        v_amount := OLD.amount;
+        IF NOT v_was_deleted THEN
+            v_bank_id := OLD.bank_account_id;
+            v_amount := OLD.amount;
+        END IF;
     END IF;
 
     IF v_bank_id IS NOT NULL THEN
-        UPDATE bank_accounts SET current_balance = current_balance + v_amount WHERE id = v_bank_id;
+        UPDATE bank_accounts SET current_balance = current_balance + COALESCE(v_amount, 0) WHERE id = v_bank_id;
     END IF;
     RETURN NULL;
 END;
@@ -620,18 +681,40 @@ CREATE TRIGGER update_bank_transfers_updated BEFORE UPDATE ON bank_transfers FOR
 -- Balance Trigger Function for Transfers
 CREATE OR REPLACE FUNCTION update_bank_balance_transfer()
 RETURNS TRIGGER AS $$
+DECLARE
+    v_is_deleted BOOLEAN;
+    v_was_deleted BOOLEAN;
 BEGIN
+    v_is_deleted := (NEW.deleted_at IS NOT NULL);
+    v_was_deleted := (OLD.deleted_at IS NOT NULL);
+
     IF (TG_OP = 'INSERT') THEN
-        UPDATE bank_accounts SET current_balance = current_balance - NEW.amount WHERE id = NEW.from_account_id;
-        UPDATE bank_accounts SET current_balance = current_balance + NEW.amount WHERE id = NEW.to_account_id;
+        IF NOT v_is_deleted THEN
+            UPDATE bank_accounts SET current_balance = current_balance - NEW.amount WHERE id = NEW.from_account_id;
+            UPDATE bank_accounts SET current_balance = current_balance + NEW.amount WHERE id = NEW.to_account_id;
+        END IF;
     ELSIF (TG_OP = 'UPDATE') THEN
-        UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.from_account_id;
-        UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.to_account_id;
-        UPDATE bank_accounts SET current_balance = current_balance - NEW.amount WHERE id = NEW.from_account_id;
-        UPDATE bank_accounts SET current_balance = current_balance + NEW.amount WHERE id = NEW.to_account_id;
+        -- Handle soft delete/restore
+        IF NOT v_was_deleted AND v_is_deleted THEN
+            -- Record was deleted: reverse transfer
+            UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.from_account_id;
+            UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.to_account_id;
+        ELSIF v_was_deleted AND NOT v_is_deleted THEN
+            -- Record was restored: apply transfer
+            UPDATE bank_accounts SET current_balance = current_balance - NEW.amount WHERE id = NEW.from_account_id;
+            UPDATE bank_accounts SET current_balance = current_balance + NEW.amount WHERE id = NEW.to_account_id;
+        ELSIF NOT v_is_deleted THEN
+            -- Normal update: reverse old, apply new
+            UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.from_account_id;
+            UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.to_account_id;
+            UPDATE bank_accounts SET current_balance = current_balance - NEW.amount WHERE id = NEW.from_account_id;
+            UPDATE bank_accounts SET current_balance = current_balance + NEW.amount WHERE id = NEW.to_account_id;
+        END IF;
     ELSIF (TG_OP = 'DELETE') THEN
-        UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.from_account_id;
-        UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.to_account_id;
+        IF NOT v_was_deleted THEN
+            UPDATE bank_accounts SET current_balance = current_balance + OLD.amount WHERE id = OLD.from_account_id;
+            UPDATE bank_accounts SET current_balance = current_balance - OLD.amount WHERE id = OLD.to_account_id;
+        END IF;
     END IF;
     RETURN NULL;
 END;
@@ -640,3 +723,39 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_bank_transfer_balance 
 AFTER INSERT OR UPDATE OR DELETE ON bank_transfers 
 FOR EACH ROW EXECUTE FUNCTION update_bank_balance_transfer();
+
+-- 12. UTILITY: RECALCULATE ALL BANK BALANCES
+CREATE OR REPLACE FUNCTION recalculate_bank_balances(p_org_id UUID)
+RETURNS VOID AS $$
+DECLARE
+    r RECORD;
+BEGIN
+    -- 1. Reset all balances to opening_balance
+    UPDATE bank_accounts 
+    SET current_balance = opening_balance 
+    WHERE org_id = p_org_id AND deleted_at IS NULL;
+
+    -- 2. Apply Income
+    FOR r IN SELECT bank_account_id, amount FROM income WHERE org_id = p_org_id AND deleted_at IS NULL AND bank_account_id IS NOT NULL LOOP
+        UPDATE bank_accounts SET current_balance = current_balance + r.amount WHERE id = r.bank_account_id;
+    END LOOP;
+
+    -- 3. Apply Expenses (Direct payments)
+    -- WARNING: This assumes that if an expense has a bank_account_id, it was paid directly and doesn't have separate expense_payments records.
+    FOR r IN SELECT bank_account_id, total_paid FROM expenses WHERE org_id = p_org_id AND deleted_at IS NULL AND bank_account_id IS NOT NULL LOOP
+        UPDATE bank_accounts SET current_balance = current_balance - r.total_paid WHERE id = r.bank_account_id;
+    END LOOP;
+
+    -- 4. Apply Expense Payments (Part payments)
+    FOR r IN SELECT bank_account_id, amount FROM expense_payments WHERE org_id = p_org_id AND deleted_at IS NULL AND bank_account_id IS NOT NULL LOOP
+        UPDATE bank_accounts SET current_balance = current_balance - r.amount WHERE id = r.bank_account_id;
+    END LOOP;
+
+    -- 5. Apply Transfers
+    FOR r IN SELECT from_account_id, to_account_id, amount FROM bank_transfers WHERE org_id = p_org_id AND deleted_at IS NULL LOOP
+        UPDATE bank_accounts SET current_balance = current_balance - r.amount WHERE id = r.from_account_id;
+        UPDATE bank_accounts SET current_balance = current_balance + r.amount WHERE id = r.to_account_id;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+

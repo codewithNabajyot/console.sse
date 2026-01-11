@@ -50,6 +50,7 @@ export interface BankAccount {
   account_name: string
   bank_name: string | null
   account_number: string | null
+  opening_balance: number
   current_balance: number
   notes: Note[]
   deleted_at: string | null
