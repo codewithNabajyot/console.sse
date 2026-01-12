@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -29,11 +29,13 @@ type FormData = {
 
 export default function IncomeForm() {
   const { orgSlug, id } = useParams()
+  const [searchParams] = useSearchParams()
+  const initialProjectId = searchParams.get('project_id')
   const navigate = useNavigate()
   const isEditMode = !!id
 
   const { data: income, isLoading: isIncomeLoading } = useIncomeById(id)
-  const { data: projects, isLoading: isProjectsLoading } = useProjects(false, false)
+  const { data: projects, isLoading: isProjectsLoading } = useProjects(false, true)
   const { data: invoices, isLoading: isInvoicesLoading } = useInvoices()
   const { data: customers, isLoading: isCustomersLoading } = useCustomers()
   const { data: bankAccounts, isLoading: isBanksLoading } = useBankAccounts()
@@ -53,7 +55,7 @@ export default function IncomeForm() {
   } = useForm<FormData>({
     defaultValues: {
       invoice_id: '',
-      project_id: '',
+      project_id: initialProjectId || '',
       customer_id: '',
       bank_account_id: '',
       date: new Date().toISOString().split('T')[0],
@@ -131,14 +133,14 @@ export default function IncomeForm() {
       } else {
         await createIncome.mutateAsync(input)
       }
-      navigate(`/${orgSlug}/income`)
+      navigate(initialProjectId ? `/${orgSlug}/projects/${initialProjectId}` : `/${orgSlug}/income`)
     } catch (error) {
       console.error('Form submission error:', error)
     }
   }
 
   const handleCancel = () => {
-    navigate(`/${orgSlug}/income`)
+    navigate(initialProjectId ? `/${orgSlug}/projects/${initialProjectId}` : `/${orgSlug}/income`)
   }
 
   const isLoading = isIncomeLoading || isProjectsLoading || isInvoicesLoading || isCustomersLoading || isBanksLoading || isCategoriesLoading || isModesLoading

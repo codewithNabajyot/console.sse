@@ -98,6 +98,8 @@ export interface Project {
   notes: Note[]
   income?: Income[]
   expenses?: Expense[]
+  expense_payments?: ExpensePayment[]
+  invoices?: Invoice[]
   deleted_at: string | null
   created_at: string
   updated_at: string

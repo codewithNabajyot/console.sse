@@ -65,10 +65,13 @@ export function useCreateExpensePayment() {
 
       return paymentData
     },
-    onSuccess: () => {
+    onSuccess: (updatedPayment) => {
       queryClient.invalidateQueries({ queryKey: ['expense_payments', orgId] })
-      queryClient.invalidateQueries({ queryKey: ['expenses', orgId] }) // Refresh expenses to show paid status if we ever implement that
+      queryClient.invalidateQueries({ queryKey: ['expenses', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
+      if (updatedPayment.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', updatedPayment.project_id] })
+      }
       toast.success('Payment recorded successfully')
     },
     onError: (error: Error) => {
@@ -98,10 +101,13 @@ export function useUpdateExpensePayment() {
       if (error) throw error
       return data
     },
-    onSuccess: () => {
+    onSuccess: (updatedPayment: any) => {
       queryClient.invalidateQueries({ queryKey: ['expense_payments', orgId] })
       queryClient.invalidateQueries({ queryKey: ['expenses', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
+      if (updatedPayment.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', updatedPayment.project_id] })
+      }
       toast.success('Payment updated successfully')
     },
     onError: (error: Error) => {
@@ -120,18 +126,24 @@ export function useDeleteExpensePayment() {
     mutationFn: async (id: string) => {
       if (!orgId) throw new Error('Organization ID is required')
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('expense_payments')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
         .eq('org_id', orgId)
+        .select()
+        .single()
 
       if (error) throw error
+      return data
     },
-    onSuccess: () => {
+    onSuccess: (deletedPayment: any) => {
       queryClient.invalidateQueries({ queryKey: ['expense_payments', orgId] })
       queryClient.invalidateQueries({ queryKey: ['expenses', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
+      if (deletedPayment.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', deletedPayment.project_id] })
+      }
       toast.success('Payment deleted successfully')
     },
     onError: (error: Error) => {

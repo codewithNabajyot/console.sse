@@ -1,15 +1,13 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search, CheckCircle2, Clock, Briefcase, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, CheckCircle2, Clock, Briefcase, Eye, MoreVertical } from 'lucide-react'
 import { useProjects, useDeleteProject, useUpdateProject } from '@/hooks/useProjects'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Note, Project } from '@/lib/types'
+import type { Note } from '@/lib/types'
 import { NotesManager } from '@/components/NotesManager'
 import { Badge } from '@/components/ui/badge'
-import { PaymentHistoryModal } from '@/components/PaymentHistoryModal'
-import { ProjectFinancialsModal } from '@/components/ProjectFinancialsModal'
 import {
   Table,
   TableBody,
@@ -27,10 +25,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/shared/PageHeader'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 type FilterType = 'ALL_ACTIVE' | 'BOOKED' | 'IN_PROGRESS' | 'COMPLETED'
 
@@ -41,19 +44,6 @@ export default function Projects() {
   const { data: projects, isLoading } = useProjects(true) // Fetch all including completed
   const deleteProject = useDeleteProject()
   const updateProject = useUpdateProject()
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
-  const [isFinancialsModalOpen, setIsFinancialsModalOpen] = useState(false)
-
-  const handleView = (project: Project) => {
-    setSelectedProject(project)
-    setIsViewModalOpen(true)
-  }
-
-  const handleFinancials = (project: Project) => {
-    setSelectedProject(project)
-    setIsFinancialsModalOpen(true)
-  }
 
   const stats = {
     booked: projects?.filter(p => !p.deleted_at && p.status === 'Booked').length || 0,
@@ -80,8 +70,11 @@ export default function Projects() {
     return true
   })
 
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null)
+
   const handleDelete = (id: string) => {
     deleteProject.mutate(id)
+    setDeleteConfirm(null)
   }
 
   const getStatusBadgeVariant = (status: string | null) => {
@@ -229,38 +222,20 @@ export default function Projects() {
                               ₹{(project.deal_value - (project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)).toLocaleString('en-IN')}
                             </span>
                           )}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6"
-                            onClick={() => handleView(project)}
-                            title="View Payment History"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 text-blue-600">
                           {(() => {
                             const income = project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0;
                             const expenses = project.expenses?.reduce((sum, exp) => sum + exp.total_paid, 0) || 0;
                             const profit = income - expenses;
                             return (
-                              <span className={profit >= 0 ? 'text-blue-600' : 'text-red-600'}>
-                                ₹{profit.toLocaleString('en-IN')}
-                              </span>
+                                <span>
+                                  ₹{profit.toLocaleString('en-IN')}
+                                </span>
                             );
                           })()}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6"
-                            onClick={() => handleFinancials(project)}
-                            title="View Detailed Financials"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -268,55 +243,47 @@ export default function Projects() {
                           {project.status || 'Draft'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2 text-primary">
-                          <NotesManager
-                            notes={project.notes}
-                            onUpdate={async (newNotes: Note[], message: string) => {
-                              await updateProject.mutateAsync({
-                                id: project.id,
-                                input: { notes: newNotes },
-                                successMessage: message
-                              })
-                            }}
-                            title={`Notes for ${project.project_id_code}`}
-                            entityName={project.project_id_code}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                          >
-                            <Link to={`/${orgSlug}/projects/${project.id}/edit`}>
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Project</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete project {project.project_id_code}? This action will soft-delete the record.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(project.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" asChild>
+                          <Link to={`/${orgSlug}/projects/${project.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <NotesManager
+                          notes={project.notes}
+                          onUpdate={async (newNotes: Note[], message: string) => {
+                            await updateProject.mutateAsync({
+                              id: project.id,
+                              input: { notes: newNotes },
+                              successMessage: message
+                            })
+                          }}
+                          title={`Notes for ${project.project_id_code}`}
+                          entityName={project.project_id_code}
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/${orgSlug}/projects/${project.id}/edit`} className="flex items-center">
+                                <Pencil className="mr-2 h-3 w-3" /> Edit Project
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-destructive font-medium"
+                              onClick={() => setDeleteConfirm({ id: project.id, title: project.project_id_code })}
+                            >
+                              <Trash2 className="mr-2 h-3 w-3" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -336,9 +303,31 @@ export default function Projects() {
                   <span className="font-mono">{project.project_id_code}</span>
                   <span className="text-[10px] text-muted-foreground font-normal">{project.funding_type || 'No Funding'}</span>
                 </div>
-                <Badge variant={getStatusBadgeVariant(project.status)}>
-                  {project.status || 'Draft'}
-                </Badge>
+                <div className="flex items-center gap-1">
+                  <Badge variant={getStatusBadgeVariant(project.status)}>
+                    {project.status || 'Draft'}
+                  </Badge>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link to={`/${orgSlug}/projects/${project.id}/edit`} className="flex items-center">
+                          <Pencil className="mr-2 h-3 w-3" /> Edit Project
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className="text-destructive font-medium"
+                        onClick={() => setDeleteConfirm({ id: project.id, title: project.project_id_code })}
+                      >
+                        <Trash2 className="mr-2 h-3 w-3" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
@@ -360,40 +349,29 @@ export default function Projects() {
                       ₹{(project.deal_value - (project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0)).toLocaleString('en-IN')}
                     </span>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleView(project)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
               <div className="flex justify-between items-center pt-2 border-t font-semibold">
                 <span className="text-muted-foreground">Profit Margin:</span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-blue-600">
                   {(() => {
                     const income = project.income?.reduce((sum, inc) => sum + inc.amount, 0) || 0;
                     const expenses = project.expenses?.reduce((sum, exp) => sum + exp.total_paid, 0) || 0;
                     const profit = income - expenses;
                     return (
-                      <span className={profit >= 0 ? 'text-blue-600' : 'text-red-600'}>
-                        ₹{profit.toLocaleString('en-IN')}
-                      </span>
+                        <span>
+                          ₹{profit.toLocaleString('en-IN')}
+                        </span>
                     );
                   })()}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleFinancials(project)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className="flex justify-end gap-2 pt-2 border-t text-primary">
+                <Button variant="ghost" size="icon" className="h-9 w-9" asChild>
+                  <Link to={`/${orgSlug}/projects/${project.id}`}>
+                    <Eye className="h-4 w-4" />
+                  </Link>
+                </Button>
                 <NotesManager
                   notes={project.notes}
                   onUpdate={async (newNotes: Note[], message: string) => {
@@ -406,54 +384,32 @@ export default function Projects() {
                   title={`Notes for ${project.project_id_code}`}
                   entityName={project.project_id_code}
                 />
-                <Button variant="ghost" size="icon" asChild>
-                  <Link to={`/${orgSlug}/projects/${project.id}/edit`}>
-                    <Pencil className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Project</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete project {project.project_id_code}?
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleDelete(project.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
-      <PaymentHistoryModal
-        title={selectedProject?.project_id_code || ''}
-        totalLabel="Deal Value"
-        totalAmount={selectedProject?.deal_value || 0}
-        income={selectedProject?.income}
-        isOpen={isViewModalOpen}
-        onClose={() => setIsViewModalOpen(false)}
-      />
 
-      <ProjectFinancialsModal
-        project={selectedProject}
-        isOpen={isFinancialsModalOpen}
-        onClose={() => setIsFinancialsModalOpen(false)}
-      />
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete project {deleteConfirm?.title}? This action will soft-delete the record.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirm && handleDelete(deleteConfirm.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

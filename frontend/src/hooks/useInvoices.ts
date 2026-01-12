@@ -141,8 +141,11 @@ export function useUpdateInvoice() {
       if (error) throw error
       return data as Invoice
     },
-    onSuccess: () => {
+    onSuccess: (updatedInvoice) => {
       queryClient.invalidateQueries({ queryKey: ['invoices', orgId] })
+      if (updatedInvoice.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', updatedInvoice.project_id] })
+      }
       toast.success('Invoice updated successfully')
     },
     onError: (error: Error) => {
@@ -211,8 +214,11 @@ export function useDeleteInvoice() {
       if (error) throw error
       return data as Invoice
     },
-    onSuccess: () => {
+    onSuccess: (deletedInvoice) => {
       queryClient.invalidateQueries({ queryKey: ['invoices', orgId] })
+      if (deletedInvoice.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', deletedInvoice.project_id] })
+      }
       toast.success('Invoice and its Drive attachments deleted successfully')
     },
     onError: (error: Error) => {

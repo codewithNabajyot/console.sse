@@ -112,9 +112,12 @@ export function useUpdateIncome() {
       if (error) throw error
       return data as Income
     },
-    onSuccess: () => {
+    onSuccess: (updatedIncome) => {
       queryClient.invalidateQueries({ queryKey: ['income', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
+      if (updatedIncome.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', updatedIncome.project_id] })
+      }
       toast.success('Income updated successfully')
     },
     onError: (error: Error) => {
@@ -144,9 +147,12 @@ export function useDeleteIncome() {
       if (error) throw error
       return data as Income
     },
-    onSuccess: () => {
+    onSuccess: (deletedIncome) => {
       queryClient.invalidateQueries({ queryKey: ['income', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
+      if (deletedIncome.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', deletedIncome.project_id] })
+      }
       toast.success('Income deleted successfully')
     },
     onError: (error: Error) => {

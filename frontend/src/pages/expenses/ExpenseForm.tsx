@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -29,6 +29,8 @@ type FormData = {
 
 export default function ExpenseForm() {
   const { orgSlug, id } = useParams()
+  const [searchParams] = useSearchParams()
+  const initialProjectId = searchParams.get('project_id')
   const navigate = useNavigate()
   const location = useLocation()
   const isEditMode = !!id
@@ -58,7 +60,7 @@ export default function ExpenseForm() {
     setValue
   } = useForm<FormData>({
     defaultValues: {
-      project_id: '',
+      project_id: initialProjectId || '',
       vendor_id: '',
       bank_account_id: '',
       date: new Date().toISOString().split('T')[0],
@@ -136,14 +138,14 @@ export default function ExpenseForm() {
       } else {
         await createExpense.mutateAsync(input)
       }
-      navigate(`/${orgSlug}/expenses`)
+      navigate(initialProjectId ? `/${orgSlug}/projects/${initialProjectId}` : `/${orgSlug}/expenses`)
     } catch (error) {
       console.error('Form submission error:', error)
     }
   }
 
   const handleCancel = () => {
-    navigate(`/${orgSlug}/expenses`)
+    navigate(initialProjectId ? `/${orgSlug}/projects/${initialProjectId}` : `/${orgSlug}/expenses`)
   }
 
   const isLoading = isExpenseLoading || isProjectsLoading || isVendorsLoading || isBanksLoading

@@ -10,12 +10,16 @@ import { ProjectCustomerInfo } from '@/components/shared/ProjectCustomerInfo'
 import { AmountGstInfo } from '@/components/shared/AmountGstInfo'
 import { PaymentMethodInfo } from '@/components/shared/PaymentMethodInfo'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { RecordPaymentModal } from '@/components/expenses/RecordPaymentModal'
+import { Plus } from 'lucide-react'
+import { useState } from 'react'
 
 export default function VendorLedger() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const { data: vendor } = useVendor(id)
-  const { data: ledger, isLoading } = useVendorLedger(id)
+  const { data: ledger, isLoading, refetch } = useVendorLedger(id)
 
   const handlePrint = () => {
     window.print()
@@ -42,10 +46,16 @@ export default function VendorLedger() {
           </Button>
         }
       >
-        <Button onClick={handlePrint} className="bg-primary text-primary-foreground">
-          <Printer className="mr-2 h-4 w-4" />
-          Print Ledger
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsPaymentModalOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Payment
+          </Button>
+          <Button onClick={handlePrint} className="bg-primary text-primary-foreground">
+            <Printer className="mr-2 h-4 w-4" />
+            Print Ledger
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Print-Only Header */}
@@ -214,6 +224,13 @@ export default function VendorLedger() {
           th, td { border: 1px solid #e5e7eb !important; padding: 4px 8px !important; }
         }
       `}} />
+
+      <RecordPaymentModal 
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        initialVendorId={id}
+        onSuccess={() => refetch()}
+      />
     </div>
   )
 }

@@ -110,9 +110,12 @@ export function useUpdateExpense() {
       if (error) throw error
       return data as Expense
     },
-    onSuccess: () => {
+    onSuccess: (updatedExpense) => {
       queryClient.invalidateQueries({ queryKey: ['expenses', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
+      if (updatedExpense.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', updatedExpense.project_id] })
+      }
       toast.success('Expense updated successfully')
     },
     onError: (error: Error) => {
@@ -142,9 +145,12 @@ export function useDeleteExpense() {
       if (error) throw error
       return data as Expense
     },
-    onSuccess: () => {
+    onSuccess: (deletedExpense) => {
       queryClient.invalidateQueries({ queryKey: ['expenses', orgId] })
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', orgId] })
+      if (deletedExpense.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['project', deletedExpense.project_id] })
+      }
       toast.success('Expense deleted successfully')
     },
     onError: (error: Error) => {

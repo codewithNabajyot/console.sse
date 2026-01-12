@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -30,11 +30,13 @@ type FormData = {
 
 export default function InvoiceForm() {
   const { orgSlug, id } = useParams()
+  const [searchParams] = useSearchParams()
+  const initialProjectId = searchParams.get('project_id')
   const navigate = useNavigate()
   const isEditMode = !!id
 
   const { data: invoice, isLoading: isInvoiceLoading } = useInvoiceById(id)
-  const { data: projects, isLoading: isProjectsLoading } = useProjects(false, false)
+  const { data: projects, isLoading: isProjectsLoading } = useProjects(false, true)
   const { data: customers, isLoading: isCustomersLoading } = useCustomers()
   
   const { profile } = useAuth()
@@ -54,7 +56,7 @@ export default function InvoiceForm() {
     setValue,
   } = useForm<FormData>({
     defaultValues: {
-      project_id: '',
+      project_id: initialProjectId || '',
       customer_id: '',
       date: new Date().toISOString().split('T')[0],
       invoice_number: '',
@@ -165,14 +167,14 @@ export default function InvoiceForm() {
         
         if (error) throw error
       }
-      navigate(`/${orgSlug}/invoices`)
+      navigate(initialProjectId ? `/${orgSlug}/projects/${initialProjectId}` : `/${orgSlug}/invoices`)
     } catch (error) {
       console.error('Form submission error:', error)
     }
   }
 
   const handleCancel = () => {
-    navigate(`/${orgSlug}/invoices`)
+    navigate(initialProjectId ? `/${orgSlug}/projects/${initialProjectId}` : `/${orgSlug}/invoices`)
   }
 
   const isLoading = isInvoiceLoading || isProjectsLoading || isCustomersLoading

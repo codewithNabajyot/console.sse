@@ -23,9 +23,10 @@ interface RecordPaymentModalProps {
     project_id?: string | null
     amount: number
   } | null
+  initialVendorId?: string
 }
 
-export function RecordPaymentModal({ isOpen, onClose, onSuccess, paymentToEdit, initialBill }: RecordPaymentModalProps) {
+export function RecordPaymentModal({ isOpen, onClose, onSuccess, paymentToEdit, initialBill, initialVendorId }: RecordPaymentModalProps) {
   const { data: vendors } = useVendors()
   const { data: bankAccounts } = useBankAccounts()
   const { data: projects } = useProjects(false, false)
@@ -69,6 +70,17 @@ export function RecordPaymentModal({ isOpen, onClose, onSuccess, paymentToEdit, 
            notes: []
         })
         setDescription(`Payment for Bill #${initialBill.expense_number || initialBill.id}`)
+     } else if (initialVendorId) {
+        setFormData({
+            date: new Date().toISOString().split('T')[0],
+            amount: 0,
+            vendor_id: initialVendorId,
+            bank_account_id: '',
+            project_id: '', 
+            payment_mode: 'Bank Transfer',
+            notes: []
+        })
+        setDescription('')
      } else {
         // Reset
         setFormData({

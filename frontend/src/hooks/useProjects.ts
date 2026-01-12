@@ -49,16 +49,45 @@ export function useProject(id: string | undefined) {
       if (!id) throw new Error('Project ID is required')
       if (!orgId) throw new Error('Organization ID is required')
       
-      const { data, error } = await supabase
+      const { data: project, error } = await supabase
         .from('projects')
-        .select('*, customer:customers(*)')
+        .select(`
+          *, 
+          customer:customers(*),
+          invoices(*, income(*)),
+          income(*, bank_account:bank_accounts(*), invoice:invoices(*)),
+          expenses(*, vendor:vendors(*), allocations:payment_allocations(*, payment:expense_payments(*))),
+          expense_payments:expense_payments(*, bank_account:bank_accounts(*), vendor:vendors(*), allocations:payment_allocations(*, expense:expenses(*)))
+        `)
         .eq('id', id)
         .eq('org_id', orgId)
         .is('deleted_at', null)
+        .is('invoices.deleted_at', null)
+        .is('income.deleted_at', null)
+        .is('expenses.deleted_at', null)
         .single()
 
       if (error) throw error
-      return data as Project
+
+      // Fetch attachments for invoices
+      const invoiceIds = project.invoices?.map((inv: any) => inv.id) || []
+      if (invoiceIds.length > 0) {
+        const { data: attachments } = await supabase
+          .from('attachments')
+          .select('*')
+          .eq('entity_type', 'invoice')
+          .in('entity_id', invoiceIds)
+          .is('deleted_at', null)
+
+        if (attachments) {
+          project.invoices = project.invoices.map((inv: any) => ({
+            ...inv,
+            attachments: attachments.filter((a: any) => a.entity_id === inv.id)
+          }))
+        }
+      }
+
+      return project as Project
     },
     enabled: !!id && !!orgId,
   })
