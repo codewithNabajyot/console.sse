@@ -141,13 +141,16 @@ export default function VendorLedger() {
                     </TableCell>
                     <TableCell className="print:py-2">
                       <div className="flex flex-col">
-                        <span className="font-mono text-[9px] text-muted-foreground uppercase font-bold print:hidden">{t.type}</span>
+                        <span className={cn(
+                          "font-mono text-[9px] uppercase font-bold print:hidden",
+                          t.type === 'Direct' ? "text-green-600" : "text-muted-foreground"
+                        )}>{t.type}</span>
                         <span className={cn("font-mono text-[10px] font-bold", t.type === 'Bill' ? "text-blue-600" : "text-blue-600")}>{t.number}</span>
                       </div>
                     </TableCell>
                     <TableCell className="print:py-2">
                       <div className="flex flex-col">
-                        {t.type === 'Bill' ? (
+                        {t.type === 'Bill' || t.type === 'Direct' ? (
                           <>
                             <span className="text-sm font-semibold line-clamp-1 print:text-[10px] print:line-clamp-none whitespace-normal">{t.description || '—'}</span>
                             <ProjectCustomerInfo project={t.project} className="print:text-black print:text-[9px]" />
@@ -162,7 +165,18 @@ export default function VendorLedger() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right py-4 bg-muted/10">
-                      {t.type === 'Bill' ? (
+                      {t.type === 'Direct' ? (
+                        <div className="flex flex-col items-end">
+                          <AmountGstInfo 
+                            amount={t.debit} 
+                            showGst={false} 
+                            amountClassName="text-muted-foreground font-bold" 
+                            className="items-end" 
+                            currencySymbol="±"
+                          />
+                          <span className="text-[9px] font-black text-green-600 uppercase tracking-tighter">Paid Direct</span>
+                        </div>
+                      ) : t.type === 'Bill' ? (
                         <AmountGstInfo 
                           amount={t.debit} 
                           showGst={false} 

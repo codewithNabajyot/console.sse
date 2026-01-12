@@ -158,7 +158,7 @@ export function useVendorLedger(vendorId: string | undefined) {
       // Fetch Expenses
       const { data: expenses, error: expError } = await supabase
         .from('expenses')
-        .select('*, project:projects(*, customer:customers(*))')
+        .select('*, project:projects(*, customer:customers(*)), bank_account:bank_accounts(*)')
         .eq('vendor_id', vendorId)
         .eq('org_id', orgId)
         .is('deleted_at', null)
@@ -176,17 +176,29 @@ export function useVendorLedger(vendorId: string | undefined) {
       if (payError) throw payError
 
       // Combine and Sort
-      const transactions = [
-        ...(expenses || []).map(exp => ({
+      const expenseTransactions = (expenses || []).map(exp => {
+        const isDirect = !!exp.bank_account_id;
+        const description = isDirect 
+          ? `${exp.description || 'Expense'} (Paid Direct via ${exp.bank_account?.bank_name || 'Bank'} - ${exp.bank_account?.account_name})`
+          : exp.description;
+
+        return {
           id: exp.id,
           date: exp.date,
           number: exp.expense_number || 'EXP-???',
-          type: 'Bill' as const,
-          description: exp.description,
-          project: exp.project, // Full project object
-          debit: exp.total_paid, // Increases what we owe
-          credit: 0
-        })),
+          type: (isDirect ? 'Direct' : 'Bill') as 'Bill' | 'Payment' | 'Direct',
+          description: description,
+          project: exp.project,
+          bank_account: exp.bank_account,
+          debit: exp.total_paid, // Increases what we owe (Bill part)
+          credit: isDirect ? exp.total_paid : 0, // Decreases what we owe (Payment part)
+          isDirect: isDirect,
+          payment_mode: undefined
+        }
+      })
+
+      const transactions = [
+        ...expenseTransactions,
         ...(payments || []).map(pay => ({
           id: pay.id,
           date: pay.date,
@@ -197,7 +209,8 @@ export function useVendorLedger(vendorId: string | undefined) {
           bank_account: pay.bank_account,
           payment_mode: pay.payment_mode,
           debit: 0,
-          credit: pay.amount // Decreases what we owe
+          credit: pay.amount, // Decreases what we owe
+          isDirect: false
         }))
       ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
