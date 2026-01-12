@@ -90,7 +90,7 @@ export function useUpdateBankAccount() {
   const orgId = profile?.org_id
 
   return useMutation({
-    mutationFn: async ({ id, input }: { id: string; input: Partial<BankAccountInput>; successMessage?: string }) => {
+    mutationFn: async ({ id, input }: { id: string; input: Partial<BankAccount>; successMessage?: string }) => {
       if (!orgId) throw new Error('Organization ID is required')
       
       const { data, error } = await supabase
@@ -141,6 +141,29 @@ export function useDeleteBankAccount() {
     },
     onError: (error: Error) => {
       toast.error('Failed to delete bank account', error.message)
+    },
+  })
+}
+
+// Hook to call the computed balance RPC
+export function useComputedBankBalance() {
+  const { profile } = useAuth()
+  const orgId = profile?.org_id
+
+  return useMutation({
+    mutationFn: async (bankAccountId: string) => {
+      if (!orgId) throw new Error('Organization ID is required')
+      
+      const { data, error } = await supabase
+        .rpc('calculate_single_bank_balance', {
+          p_bank_account_id: bankAccountId
+        })
+
+      if (error) throw error
+      return data as number
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to compute bank balance', error.message)
     },
   })
 }

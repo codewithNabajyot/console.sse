@@ -100,6 +100,27 @@ CREATE TABLE bank_accounts (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Trigger function to sync current_balance when opening_balance changes
+CREATE OR REPLACE FUNCTION sync_bank_current_balance()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        NEW.current_balance := NEW.opening_balance;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        IF (OLD.opening_balance != NEW.opening_balance) THEN
+            NEW.current_balance := NEW.current_balance + (NEW.opening_balance - OLD.opening_balance);
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach opening balance sync trigger
+DROP TRIGGER IF EXISTS trg_bank_opening_balance_sync ON bank_accounts;
+CREATE TRIGGER trg_bank_opening_balance_sync
+BEFORE INSERT OR UPDATE OF opening_balance ON bank_accounts
+FOR EACH ROW EXECUTE FUNCTION sync_bank_current_balance();
+
 
 -- 6. REAL-TIME BALANCE TRACKING TRIGGERS
 

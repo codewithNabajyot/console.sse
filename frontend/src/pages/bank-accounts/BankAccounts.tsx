@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Search, ArrowRightLeft } from 'lucide-react'
-import { useBankAccounts, useDeleteBankAccount, useUpdateBankAccount } from '@/hooks/useBankAccounts'
+import { Plus, Pencil, Trash2, Search, ArrowRightLeft, RefreshCw } from 'lucide-react'
+import { useBankAccounts, useDeleteBankAccount, useUpdateBankAccount, useComputedBankBalance } from '@/hooks/useBankAccounts'
 import { InternalTransferModal } from '@/components/bank-accounts/InternalTransferModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Note } from '@/lib/types'
+import { toast } from '@/hooks/use-toast'
+import type { BankAccount, Note } from '@/lib/types'
 import { NotesManager } from '@/components/NotesManager'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -36,7 +37,43 @@ export default function BankAccounts() {
   const { data: bankAccounts, isLoading } = useBankAccounts()
   const deleteBankAccount = useDeleteBankAccount()
   const updateBankAccount = useUpdateBankAccount()
+  const computeBalance = useComputedBankBalance()
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [reconciliationAccount, setReconciliationAccount] = useState<{
+    id: string;
+    account_name: string;
+    stored: number;
+    computed: number;
+  } | null>(null)
+
+  const handleRecalculate = async (account: BankAccount) => {
+    try {
+      const computed = await computeBalance.mutateAsync(account.id)
+      if (Math.abs(Number(computed) - Number(account.current_balance)) < 0.01) {
+        toast.success(`Balance for ${account.account_name} is accurate`)
+      } else {
+        setReconciliationAccount({
+          id: account.id,
+          account_name: account.account_name,
+          stored: account.current_balance,
+          computed: computed
+        })
+      }
+    } catch (error) {
+      // Error handled by mutation
+    }
+  }
+
+  const handleConfirmReconciliation = async () => {
+    if (!reconciliationAccount) return
+    
+    await updateBankAccount.mutateAsync({
+      id: reconciliationAccount.id,
+      input: { current_balance: reconciliationAccount.computed },
+      successMessage: `Balance for ${reconciliationAccount.account_name} has been reconciled`
+    })
+    setReconciliationAccount(null)
+  }
 
   const filteredBankAccounts = bankAccounts?.filter((account) =>
     account.account_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -124,9 +161,20 @@ export default function BankAccounts() {
                       <TableCell>{account.account_number || '—'}</TableCell>
                       <TableCell className="text-right">{formatCurrency(account.opening_balance)}</TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={account.current_balance >= 0 ? 'success' : 'destructive'}>
-                          {formatCurrency(account.current_balance)}
-                        </Badge>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => handleRecalculate(account)}
+                            disabled={computeBalance.isPending}
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${computeBalance.isPending ? 'animate-spin' : ''}`} />
+                          </Button>
+                          <Badge variant={account.current_balance >= 0 ? 'success' : 'destructive'}>
+                            {formatCurrency(account.current_balance)}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 text-primary">
@@ -262,11 +310,23 @@ export default function BankAccounts() {
                   <span className="text-muted-foreground">Opening Balance:</span>{' '}
                   <span className="font-medium">{formatCurrency(account.opening_balance)}</span>
                 </div>
-                <div>
+                <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Current Balance:</span>{' '}
-                  <Badge variant={account.current_balance >= 0 ? 'success' : 'destructive'}>
-                    {formatCurrency(account.current_balance)}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 px-2 text-muted-foreground hover:text-primary"
+                      onClick={() => handleRecalculate(account)}
+                      disabled={computeBalance.isPending}
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 mr-1 ${computeBalance.isPending ? 'animate-spin' : ''}`} />
+                      Recalculate
+                    </Button>
+                    <Badge variant={account.current_balance >= 0 ? 'success' : 'destructive'}>
+                      {formatCurrency(account.current_balance)}
+                    </Badge>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -278,6 +338,44 @@ export default function BankAccounts() {
         isOpen={isTransferModalOpen} 
         onClose={() => setIsTransferModalOpen(false)} 
       />
+
+      <AlertDialog open={!!reconciliationAccount} onOpenChange={() => setReconciliationAccount(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Balance Discrepancy Found</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4 pt-4">
+              <p>
+                The stored balance for <strong>{reconciliationAccount?.account_name}</strong> does not match the computed balance from transaction history.
+              </p>
+              <div className="grid grid-cols-2 gap-4 rounded-lg border p-4 bg-muted/50">
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase">Stored Balance</div>
+                  <div className="text-lg font-semibold text-destructive">
+                    {reconciliationAccount && formatCurrency(reconciliationAccount.stored)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase">Computed Balance</div>
+                  <div className="text-lg font-semibold text-green-600 dark:text-green-400">
+                    {reconciliationAccount && formatCurrency(reconciliationAccount.computed)}
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Would you like to update the stored balance to match the computed value? This will fix the display but won't alter any historical transactions.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmReconciliation}
+            >
+              Update Balance
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
