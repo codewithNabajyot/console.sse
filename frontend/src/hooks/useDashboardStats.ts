@@ -16,11 +16,13 @@ export function useDashboardStats(year: string, monthIds: string[]) {
   const stats = useMemo(() => {
     if (!income || !expenses || !invoices || !projects) return null
 
-    const selectedYear = parseInt(year)
+    const isLifetime = year === 'lifetime'
+    const selectedYear = isLifetime ? 0 : parseInt(year)
     const isAllMonths = monthIds.length === 0 || monthIds.includes('all')
     const selectedMonthIndices = isAllMonths ? null : monthIds.map(m => parseInt(m))
 
     const isWithinPeriod = (dateStr: string) => {
+      if (isLifetime) return true
       const date = parseISO(dateStr)
       if (selectedMonthIndices !== null) {
         return getYear(date) === selectedYear && selectedMonthIndices.includes(getMonth(date))
@@ -29,22 +31,26 @@ export function useDashboardStats(year: string, monthIds: string[]) {
     }
 
     // 1. Filtered Data
-    const filteredIncome = income.filter(item => isWithinPeriod(item.date))
     const filteredExpenses = expenses.filter(item => isWithinPeriod(item.date))
     const filteredInvoices = invoices.filter(item => isWithinPeriod(item.date))
 
-    // 1. Financial KPIs
-    const totalRevenue = filteredIncome.reduce((sum, item) => sum + item.amount, 0)
+    // 1. Financial KPIs (Accrual Basis)
+    const totalRevenue = filteredInvoices.reduce((sum, item) => sum + item.total_amount, 0)
     const totalExpenses = filteredExpenses.reduce((sum, item) => sum + item.total_paid, 0)
     const netProfit = totalRevenue - totalExpenses
     
-    // Receivables for the selected period
-    const totalInvoiced = filteredInvoices.reduce((sum, item) => sum + item.total_amount, 0)
-    const agedReceivables = Math.max(0, totalInvoiced - totalRevenue)
+    // Receivables for the selected period (Accrual: Outstanding balance of invoices in this period)
+    const agedReceivables = filteredInvoices.reduce((sum, item) => {
+      const received = item.income?.reduce((acc, inc) => acc + inc.amount, 0) || 0
+      return sum + Math.max(0, item.total_amount - received)
+    }, 0)
 
-    // 2. Monthly Trends
+    // 2. Monthly Trends (Accrual Basis)
     let trendMonths: Date[] = []
-    if (selectedMonthIndices === null || selectedMonthIndices.length > 1) {
+    if (isLifetime) {
+      // For lifetime, show last 12 months including current
+      trendMonths = Array.from({ length: 12 }, (_, i) => startOfMonth(subMonths(new Date(), i))).reverse()
+    } else if (selectedMonthIndices === null || selectedMonthIndices.length > 1) {
       trendMonths = Array.from({ length: 12 }, (_, i) => new Date(selectedYear, i, 1))
     } else {
       const singleMonth = selectedMonthIndices[0]
@@ -53,9 +59,10 @@ export function useDashboardStats(year: string, monthIds: string[]) {
 
     const monthlyTrends = trendMonths.map(date => {
       const monthStr = format(date, 'MMM yy')
-      const mIncome = income
+      // Note: we use total_amount for invoices (Sales) and total_paid for expenses (Bills)
+      const mIncome = invoices
         .filter(item => isSameMonth(parseISO(item.date), date) && isSameYear(parseISO(item.date), date))
-        .reduce((sum, item) => sum + item.amount, 0)
+        .reduce((sum, item) => sum + item.total_amount, 0)
       const mExpense = expenses
         .filter(item => isSameMonth(parseISO(item.date), date) && isSameYear(parseISO(item.date), date))
         .reduce((sum, item) => sum + item.total_paid, 0)
@@ -77,9 +84,9 @@ export function useDashboardStats(year: string, monthIds: string[]) {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
 
-    // 4. Project Profitability (Top 5)
+    // 4. Project Profitability (Top 5 in period)
     const projectIdsInPeriod = new Set([
-      ...filteredIncome.map(i => i.project_id).filter(id => !!id),
+      ...filteredInvoices.map(i => i.project_id).filter(id => !!id),
       ...filteredExpenses.map(e => e.project_id).filter(id => !!id)
     ])
 
@@ -95,9 +102,9 @@ export function useDashboardStats(year: string, monthIds: string[]) {
       }
     })
 
-    filteredIncome.forEach(item => {
+    filteredInvoices.forEach(item => {
       if (item.project_id && projectProfitMap[item.project_id]) {
-        projectProfitMap[item.project_id].income += item.amount
+        projectProfitMap[item.project_id].income += item.total_amount
       }
     })
 
@@ -117,11 +124,12 @@ export function useDashboardStats(year: string, monthIds: string[]) {
       .sort((a, b) => b.profit - a.profit)
       .slice(0, 5)
 
-    // 5. Project Status Funnel
-    const filteredProjects = projects.filter(p => isWithinPeriod(p.created_at))
-    
+    // 5. Project Pipeline (Non-deleted)
     const statusMap: Record<string, number> = {}
-    const projectsToUse = (selectedMonthIndices === null && selectedYear === getYear(new Date())) ? projects : filteredProjects
+    // If not lifetime, we show projects CREATED in the period
+    // If lifetime, we show all current projects status
+    const projectsToUse = isLifetime ? projects : projects.filter(p => isWithinPeriod(p.created_at))
+    
     projectsToUse.forEach(p => {
       const status = p.status || 'Draft'
       statusMap[status] = (statusMap[status] || 0) + 1
@@ -130,14 +138,20 @@ export function useDashboardStats(year: string, monthIds: string[]) {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
 
-    // 6. Revenue by Funding Type
+    // 6. Revenue by Funding Type (All-time or period based on project creation)
     const fundingMap: Record<string, number> = {}
-    filteredProjects.forEach(p => {
+    projectsToUse.forEach(p => {
       const funding = p.funding_type || 'Unknown'
       fundingMap[funding] = (fundingMap[funding] || 0) + p.deal_value
     })
     const revenueByFunding = Object.entries(fundingMap)
       .map(([name, value]) => ({ name, value }))
+
+    // 7. Lifetime Stats (Always available)
+    const lifetimeStats = {
+      totalProjects: projects.length,
+      completedProjects: projects.filter(p => p.status === 'Completed').length,
+    }
 
     return {
       kpis: {
@@ -150,7 +164,8 @@ export function useDashboardStats(year: string, monthIds: string[]) {
       expenseByCategory,
       projectProfitability,
       projectPipeline,
-      revenueByFunding
+      revenueByFunding,
+      lifetimeStats
     }
   }, [income, expenses, invoices, projects, year, monthIds])
 

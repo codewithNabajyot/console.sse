@@ -49,7 +49,8 @@ export default function Dashboard() {
 
   const years = useMemo(() => {
     const currentYear = new Date().getFullYear()
-    return Array.from({ length: 5 }, (_, i) => (currentYear - i).toString())
+    const baseYears = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString())
+    return ['lifetime', ...baseYears]
   }, [])
 
   const months = [
@@ -85,11 +86,12 @@ export default function Dashboard() {
   }
 
   const selectedMonthLabel = useMemo(() => {
+    if (selectedYear === 'lifetime') return 'All Time'
     if (selectedMonths.includes('all')) return 'All Months'
     if (selectedMonths.length === 1) return months.find(m => m.value === selectedMonths[0])?.label
     if (selectedMonths.length === 12) return 'All Months'
     return `${selectedMonths.length} Months`
-  }, [selectedMonths])
+  }, [selectedMonths, selectedYear])
 
   const formatCurrency = (value: number | undefined) => {
     if (value === undefined) return '₹0'
@@ -113,47 +115,52 @@ export default function Dashboard() {
     <div className="space-y-8 pb-10">
       <PageHeader
         title="Dashboard"
-        description={`Business performance insights for ${selectedMonthLabel}, ${selectedYear}`}
+        description={selectedYear === 'lifetime' 
+          ? "Complete business performance overview since inception"
+          : `Business performance insights for ${selectedMonthLabel}, ${selectedYear}`
+        }
       >
         <div className="flex items-center gap-3 bg-muted/30 p-2 rounded-xl border border-border/50">
           <Calendar className="h-4 w-4 text-muted-foreground ml-2 hidden sm:block" />
           <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 w-[150px] justify-between text-left font-normal bg-background">
-                  <span className="truncate">{selectedMonthLabel}</span>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <DropdownMenuLabel>Select Months</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  checked={selectedMonths.includes('all')}
-                  onCheckedChange={() => toggleMonth('all')}
-                >
-                  All Months
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                {months.map(m => (
+            {selectedYear !== 'lifetime' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 w-[150px] justify-between text-left font-normal bg-background">
+                    <span className="truncate">{selectedMonthLabel}</span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end">
+                  <DropdownMenuLabel>Select Months</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
                   <DropdownMenuCheckboxItem
-                    key={m.value}
-                    checked={selectedMonths.includes(m.value)}
-                    onCheckedChange={() => toggleMonth(m.value)}
+                    checked={selectedMonths.includes('all')}
+                    onCheckedChange={() => toggleMonth('all')}
                   >
-                    {m.label}
+                    All Months
                   </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuSeparator />
+                  {months.map(m => (
+                    <DropdownMenuCheckboxItem
+                      key={m.value}
+                      checked={selectedMonths.includes(m.value)}
+                      onCheckedChange={() => toggleMonth(m.value)}
+                    >
+                      {m.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             <select 
               value={selectedYear} 
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="h-9 w-[90px] rounded-lg border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="h-9 w-[110px] rounded-lg border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               {years.map(y => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y}>{y.charAt(0).toUpperCase() + y.slice(1)}</option>
               ))}
             </select>
           </div>
@@ -164,52 +171,84 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="relative overflow-hidden group hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+            <CardTitle className="text-sm font-medium">Revenue (Sales)</CardTitle>
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.kpis.totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Income for selected period</p>
+            <p className="text-xs text-muted-foreground mt-1">Total invoiced in period</p>
           </CardContent>
           <div className="absolute bottom-0 left-0 h-1 w-full bg-green-500/20 group-hover:bg-green-500/40 transition-colors" />
         </Card>
 
         <Card className="relative overflow-hidden group hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Expenses (Bills)</CardTitle>
             <TrendingDown className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.kpis.totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Spending in this period</p>
+            <p className="text-xs text-muted-foreground mt-1">Total billed in period</p>
           </CardContent>
           <div className="absolute bottom-0 left-0 h-1 w-full bg-red-500/20 group-hover:bg-red-500/40 transition-colors" />
         </Card>
 
         <Card className="relative overflow-hidden group hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            <CardTitle className="text-sm font-medium">Accrual Profit</CardTitle>
             <Wallet className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${stats.kpis.netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
               {formatCurrency(stats.kpis.netProfit)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Period-specific margin</p>
+            <p className="text-xs text-muted-foreground mt-1">Period-specific margins</p>
           </CardContent>
           <div className="absolute bottom-0 left-0 h-1 w-full bg-blue-500/20 group-hover:bg-blue-500/40 transition-colors" />
         </Card>
 
         <Card className="relative overflow-hidden group hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Period Receivables</CardTitle>
+            <CardTitle className="text-sm font-medium">Outstanding Receivables</CardTitle>
             <Clock className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{formatCurrency(stats.kpis.agedReceivables)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Unpaid invoices in this period</p>
+            <p className="text-xs text-muted-foreground mt-1">Unpaid balance on period's invoices</p>
           </CardContent>
           <div className="absolute bottom-0 left-0 h-1 w-full bg-orange-500/20 group-hover:bg-orange-500/40 transition-colors" />
+        </Card>
+      </div>
+
+      {/* Lifetime Context Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="bg-muted/20 border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Briefcase className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Projects</p>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold">{stats.lifetimeStats.totalProjects}</span>
+                <Badge variant="outline" className="text-[10px]">{stats.lifetimeStats.completedProjects} Completed</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-muted/20 border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center">
+              <TrendingUp className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Business Health</p>
+              <p className="text-xl font-bold text-green-600">
+                {Math.round((stats.lifetimeStats.completedProjects / (stats.lifetimeStats.totalProjects || 1)) * 100)}% 
+                <span className="text-xs text-muted-foreground ml-2 font-normal">Completion Rate</span>
+              </p>
+            </div>
+          </CardContent>
         </Card>
       </div>
 
